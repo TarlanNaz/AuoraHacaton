@@ -1,0 +1,72 @@
+---
+description: 4-слойная архитектура и DI — обязательные паттерны для lib/
+globs: lib/**/*.dart
+alwaysApply: false
+---
+
+# Архитектурные правила
+
+## Слои (порядок зависимостей)
+
+```
+config → models → services (abstract) → providers → screens
+                                            ↑
+                                          utils
+```
+
+Слой выше зависит только от слоёв ниже. UI **не знает** про http/JSON.
+
+## Сервисы — всегда через интерфейс
+
+```dart
+// ❌ ПЛОХО — провайдер привязан к реализации
+class FooProvider extends ChangeNotifier {
+  final HttpFooService _service = HttpFooService();
+}
+
+// ✅ ХОРОШО — зависим от абстракции, реализация инжектится
+abstract class FooService {
+  Future<Foo> fetchFoo();
+}
+
+class HttpFooService implements FooService { /* ... */ }
+
+class FooProvider extends ChangeNotifier {
+  FooProvider({required FooService service}) : _service = service;
+  final FooService _service;
+}
+```
+
+## Composition root — только `lib/main.dart`
+
+Никаких `?? DefaultService()` в провайдерах. Все зависимости связываются
+через `MultiProvider`:
+
+```dart
+MultiProvider(
+  providers: [
+    Provider<FooService>(create: (_) => HttpFooService()),
+    ChangeNotifierProxyProvider<FooService, FooProvider>(
+      create: (ctx) => FooProvider(service: ctx.read<FooService>()),
+      update: (_, __, prev) => prev!,
+    ),
+  ],
+  ...
+)
+```
+
+## State — конечные автоматы
+
+UI-состояния провайдера — `enum`, не три-четыре `bool`-флага:
+
+```dart
+enum GenerationStatus { empty, loading, error, success }
+```
+
+Каждый переход вызывает `notifyListeners()` ровно один раз.
+
+## Запрет на God Object
+
+- Виджет > 250 строк → разбить на под-виджеты.
+- Сервис > 250 строк → возможно, нужен второй сервис.
+- Провайдер с >5 публичными `Future`-методами → подумай, не пора ли разделить.

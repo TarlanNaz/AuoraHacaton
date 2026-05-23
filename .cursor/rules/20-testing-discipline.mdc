@@ -1,0 +1,62 @@
+---
+description: DAE/ATDD дисциплина — структура и приоритет тестов
+globs: test/**/*.dart,integration_test/**/*.dart
+alwaysApply: false
+---
+
+# Тестовая дисциплина (DAE / ATDD)
+
+Источник: ATDD/DAE подход (failing acceptance test → unit tests → реализация).
+
+## Пирамида
+
+```
+acceptance     ←  test/acceptance/    (widget-тесты с фейками сервисов)
+   ↑
+unit           ←  test/unit/          (по слоям: utils/models/services/providers)
+   ↑
+integration    ←  integration_test/   (e2e-smoke, без фейков, на устройстве)
+```
+
+## Acceptance-тест — обязателен для каждой новой фичи
+
+Имя файла: `test/acceptance/<feature>_acceptance_test.dart`.
+Тест читается как user story:
+
+```dart
+testWidgets(
+  'When user types raw notes and taps generate, then a structured report '
+  'appears in the list and the input is cleared',
+  (tester) async {
+    await tester.pumpWidget(buildTestApp(...));
+    await tester.enterText(find.byType(TextField), 'обработано 45 метрик');
+    await tester.tap(find.text('Сгенерировать отчёт'));
+    await tester.pumpAndSettle();
+    expect(find.text('Отчёт готов'), findsOneWidget);
+  },
+);
+```
+
+## Фейки, не моки (где возможно)
+
+Для StorageService — `FakeStorageService` (хранит in-memory). Для
+GigaChatService — `FakeGigaChatService` со скриптуемыми ответами или
+`MockGigaChatService` через mocktail для проверки взаимодействий.
+
+## Запреты
+
+- ✗ Реальные HTTP-вызовы в `test/` (только в `integration_test/`).
+- ✗ `SharedPreferences.setMockInitialValues({})` в acceptance-тестах
+  без `FakeStorageService` поверх — иначе тест зависит от глобального состояния.
+- ✗ `await Future.delayed(...)` для синхронизации с UI — используй
+  `pumpAndSettle()` или `pump(duration)` с конкретным временем.
+
+## Зелёный CI — обязательное условие
+
+Перед коммитом:
+
+```bash
+flutter analyze && flutter test
+```
+
+Если красное — фиксь, не откладывай.

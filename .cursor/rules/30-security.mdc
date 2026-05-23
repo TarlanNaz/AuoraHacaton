@@ -1,0 +1,64 @@
+---
+description: Безопасность секретов, HTTPS, обработка пользовательского ввода
+alwaysApply: true
+---
+
+# Безопасность
+
+## Секреты — только в `.env`
+
+```dart
+// ❌ ПЛОХО
+final token = 'eyJhbGc...';
+
+// ✅ ХОРОШО
+final token = Env.gigaChatAuthKey;  // из lib/config/env.dart
+```
+
+`.env` в `.gitignore`. Шаблон без значений — `.env.example`.
+
+## URL и константы — в `lib/config/api_config.dart`
+
+Никаких magic-strings вида `'https://gigachat.devices.sberbank.ru/...'`
+в сервисах. Только `ApiConfig.chatCompletionsUrl`.
+
+## HTTPS обязателен
+
+`HttpOverrides.badCertificateCallback` разрешён **только в `kDebugMode`**.
+В release-сборке должна работать штатная валидация SSL.
+
+## Обработка ввода
+
+Перед каждым сетевым вызовом — `InputValidator.validateRawNotes(text)`:
+
+- убирает control-chars
+- проверяет длину (10..8000)
+- логирует подозрения на prompt-injection
+
+```dart
+final result = InputValidator.validateRawNotes(input);
+if (!result.isValid) {
+  throw GigaChatException(result.error!);
+}
+final cleanInput = result.sanitized;
+```
+
+## Конфиденциальные данные после API
+
+После успешной структуризации — `Report.rawText = null`. Сырые заметки
+**не персистятся** в `shared_preferences` для не-черновиков.
+
+## Никаких silent failures
+
+```dart
+// ❌ ПЛОХО
+try { ... } catch (_) {}
+
+// ✅ ХОРОШО
+try {
+  ...
+} catch (e, st) {
+  AppLogger.error('Tag', 'описание', error: e, stackTrace: st);
+  rethrow;  // или throw TypedException(...)
+}
+```

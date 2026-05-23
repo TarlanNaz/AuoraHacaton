@@ -1,0 +1,35 @@
+# Windsurf rules for Структуратор
+
+Полные инструкции — в `AGENTS.md`. Здесь критический минимум для Cascade.
+
+## Стек
+
+Flutter 3.19+ / Dart 3.3+ / Material 3, `provider`, `http`, `shared_preferences`.
+
+## 4-слойная архитектура
+
+`config → models → services → providers → screens` + `utils/`.
+Композиция в `lib/main.dart` через `MultiProvider`. Сервисы — abstract
+classes; реализации передаются провайдерам через конструктор.
+
+## TDD-цикл (DAE/ATDD)
+
+1. failing acceptance-тест → 2. failing unit-тесты → 3. реализация → 4. рефактор.
+Все тесты — `flutter_test` + `mocktail`.
+
+## Запреты
+
+- ✗ Firebase / Google services (Aurora-несовместимо)
+- ✗ hardcoded URL/токенов в `lib/`
+- ✗ `print()` — только `AppLogger`
+- ✗ `catch (_) {}`
+- ✗ блокирующие I/O в UI-потоке
+- ✗ `BuildContext` после `await` без `mounted`-проверки
+
+## После любой правки
+
+```bash
+flutter analyze && flutter test
+```
+
+Зелёный analyze — обязательное условие, не подсказка.

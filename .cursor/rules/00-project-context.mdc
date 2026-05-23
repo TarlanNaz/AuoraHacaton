@@ -1,0 +1,32 @@
+---
+description: Контекст проекта Структуратор и базовые технические выборы
+alwaysApply: true
+---
+
+# Структуратор — контекст
+
+Flutter MVP для хакатона «Пульс Авроры». Превращает сырые заметки полевого
+сотрудника в формальные отчёты через GigaChat. Работает в оффлайне.
+
+## Стек (фиксированный)
+
+- Flutter 3.19+ / Dart 3.3+ / Material 3
+- `provider` для state management и DI
+- `http` для GigaChat REST + OAuth
+- `shared_preferences` для локального кэша
+- `flutter_dotenv` для секретов
+- `mocktail` для тестов
+
+## Жёсткие исключения
+
+- **НЕТ Firebase / Google services / FCM / Crashlytics** (Aurora-OS совместимость).
+- **НЕТ rxdart / bloc** — выбран `provider`, держим единый стиль.
+- **НЕТ платформенных каналов** без явного плана интеграции.
+
+## Ключевые ссылки
+
+- `AGENTS.md` — общий контракт.
+- `lib/main.dart` — composition root.
+- `lib/config/api_config.dart` — все URL и таймауты.
+- `lib/config/env.dart` — фасад над `.env`.
+- `test/README.md` — DAE/ATDD дисциплина.
