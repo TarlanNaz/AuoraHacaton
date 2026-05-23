@@ -47,6 +47,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   String? _savedReportId;
   bool _sending = false;
   bool _geocoding = false;
+  bool _locatingGps = false;
   GeoPlace? _resolvedPlace;
 
   late final DraftAutosave _autosave;
@@ -70,9 +71,52 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
 
     _rawController.addListener(_onContentChanged);
     _resultController.addListener(_onContentChanged);
+    _locationController.addListener(_onLocationChanged);
 
-    if (_rawController.text.isNotEmpty || _imageNames.isNotEmpty) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadDraftFromReport());
+
+    if (_rawController.text.isNotEmpty ||
+        _imageNames.isNotEmpty ||
+        _savedReportId != null) {
       _autosave.schedule();
+    }
+  }
+
+  void _onLocationChanged() {
+    if (!mounted) return;
+    setState(() => _autosaveUi = AutosaveUiState.pending);
+    _autosave.schedule();
+  }
+
+  void _loadDraftFromReport() {
+    final id = _savedReportId;
+    if (id == null) return;
+
+    final matches =
+        context.read<ReportProvider>().workerReports.where((r) => r.id == id);
+    if (matches.isEmpty) return;
+    final report = matches.first;
+
+    if ((report.finalText ?? '').isNotEmpty) {
+      _resultController.text = report.finalText!;
+    }
+    if ((report.rawText ?? '').isNotEmpty && _rawController.text.isEmpty) {
+      _rawController.text = report.rawText!;
+    }
+
+    final locationText =
+        report.locationQuery ?? report.locationName ?? '';
+    if (locationText.isNotEmpty) {
+      _locationController.text = locationText;
+    }
+    if (report.hasLocationCoords) {
+      setState(() {
+        _resolvedPlace = GeoPlace(
+          displayName: report.locationName ?? locationText,
+          latitude: report.locationLat!,
+          longitude: report.locationLon!,
+        );
+      });
     }
   }
 
@@ -98,7 +142,10 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     final hasStructured = gen.status == GenerationStatus.success;
     final raw = hasStructured ? '' : _rawController.text;
     final hasPhotos = _imageNames.isNotEmpty;
-    if (raw.trim().isEmpty && !hasPhotos && _resultController.text.trim().isEmpty) {
+    if (raw.trim().isEmpty &&
+        !hasPhotos &&
+        _resultController.text.trim().isEmpty &&
+        !_hasLocationDraft()) {
       return;
     }
 
@@ -111,6 +158,9 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
 
       final finalText = hasStructured ? _resultController.text : null;
 
+      final locQuery = _locationController.text.trim();
+      final place = _resolvedPlace;
+
       final saved = await rp.upsertDraft(
         existingId: _savedReportId,
         rawText: raw,
@@ -119,6 +169,10 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         workerName: profile.fullName,
         imagePaths: _imageNames,
         templateId: tpl?.id,
+        locationQuery: locQuery.isEmpty ? null : locQuery,
+        locationName: place?.displayName,
+        locationLat: place?.latitude,
+        locationLon: place?.longitude,
       );
 
       if (!mounted) return;
@@ -144,10 +198,40 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     return files;
   }
 
+  bool _hasLocationDraft() =>
+      _locationController.text.trim().isNotEmpty || _resolvedPlace != null;
+
   String? _locationPromptContext() {
     final place = _resolvedPlace;
-    if (place == null) return null;
-    return '${place.displayName} (координаты: ${place.coordinatesLabel})';
+    if (place != null) {
+      return '${place.displayName} (координаты: ${place.coordinatesLabel})';
+    }
+    final q = _locationController.text.trim();
+    return q.isEmpty ? null : q;
+  }
+
+  Future<void> _acquireGps() async {
+    setState(() => _locatingGps = true);
+    try {
+      final place =
+          await context.read<LocationService>().getCurrentPosition();
+      if (!mounted) return;
+      setState(() {
+        _resolvedPlace = place;
+        _locationController.text = place.displayName;
+        _locatingGps = false;
+      });
+      _autosave.schedule();
+      UiFeedback.info(context, 'Геопозиция сохранена в черновик');
+    } on LocationException catch (e) {
+      if (!mounted) return;
+      setState(() => _locatingGps = false);
+      UiFeedback.warning(context, e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _locatingGps = false);
+      UiFeedback.warning(context, 'Геопозиция: $e');
+    }
   }
 
   String _systemPrompt() {
@@ -186,7 +270,8 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         _resolvedPlace = place;
         _geocoding = false;
       });
-      UiFeedback.info(context, 'Место уточнено через OpenStreetMap');
+      _autosave.schedule();
+      UiFeedback.info(context, 'Место уточнено и сохранено');
     } on LocationException catch (e) {
       if (!mounted) return;
       setState(() => _geocoding = false);
@@ -361,54 +446,87 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                   controller: _locationController,
                   decoration: InputDecoration(
                     labelText: 'Место / объект',
-                    hintText: 'Напр. цех Б, узел №4, Мурманск',
+                    hintText: 'Адрес или объект; координаты сохраняются в черновик',
                     prefixIcon: const Icon(Icons.place_outlined),
-                    suffixIcon: _geocoding
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        : IconButton(
-                            tooltip: 'Уточнить на карте (API 2)',
-                            icon: const Icon(Icons.map_outlined),
-                            onPressed: _geocoding ? null : _resolveLocation,
-                          ),
                   ),
                   onSubmitted: (_) => _resolveLocation(),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: (_geocoding || _locatingGps)
+                            ? null
+                            : _acquireGps,
+                        icon: _locatingGps
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.my_location),
+                        label: const Text('Моё местоположение'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: (_geocoding || _locatingGps)
+                            ? null
+                            : _resolveLocation,
+                        icon: _geocoding
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.map_outlined),
+                        label: const Text('Уточнить адрес'),
+                      ),
+                    ),
+                  ],
                 ),
                 if (_resolvedPlace != null) ...[
                   const SizedBox(height: 8),
                   AppCard(
                     padding: const EdgeInsets.all(12),
-                    backgroundColor:
-                        Theme.of(context).colorScheme.secondaryContainer,
-                    borderColor: Theme.of(context)
-                        .colorScheme
-                        .secondary
-                        .withValues(alpha: 0.3),
+                    backgroundColor: AppTheme.brandBlueLight,
+                    borderColor: AppTheme.cardBorder,
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(
                           Icons.check_circle_outline,
                           size: 18,
-                          color: Theme.of(context).colorScheme.secondary,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
-                            _resolvedPlace!.displayName,
-                            style: Theme.of(context).textTheme.bodySmall,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _resolvedPlace!.displayName,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Координаты: ${_resolvedPlace!.coordinatesLabel}',
+                                style: Theme.of(context).textTheme.labelMedium,
+                              ),
+                            ],
                           ),
                         ),
                         IconButton(
+                          tooltip: 'Сбросить координаты',
                           icon: const Icon(Icons.close, size: 18),
-                          onPressed: () =>
-                              setState(() => _resolvedPlace = null),
+                          onPressed: () {
+                            setState(() => _resolvedPlace = null);
+                            _autosave.schedule();
+                          },
                         ),
                       ],
                     ),

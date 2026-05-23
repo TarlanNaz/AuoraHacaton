@@ -52,13 +52,11 @@ class AppCard extends StatelessWidget {
 
     final card = Material(
       color: backgroundColor ?? scheme.surfaceContainerLowest,
-      elevation: 2,
-      shadowColor: scheme.shadow,
+      elevation: 1,
+      shadowColor: Colors.black12,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        side: BorderSide(
-          color: borderColor ?? scheme.outlineVariant.withValues(alpha: 0.55),
-        ),
+        side: BorderSide(color: borderColor ?? AppTheme.cardBorder),
       ),
       clipBehavior: Clip.antiAlias,
       child: onTap != null
@@ -101,7 +99,7 @@ class AppEmptyState extends StatelessWidget {
               width: 88,
               height: 88,
               decoration: BoxDecoration(
-                color: scheme.primaryContainer.withValues(alpha: 0.6),
+                color: AppTheme.demoPanelBackground,
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, size: 44, color: scheme.primary),
@@ -254,7 +252,7 @@ class AppReportTile extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: scheme.primaryContainer.withValues(alpha: 0.65),
+                    color: AppTheme.brandBlueLight,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(

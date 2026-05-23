@@ -22,6 +22,9 @@ class ApiConfig {
   static const String nominatimSearchUrl =
       'https://nominatim.openstreetmap.org/search';
 
+  static const String nominatimReverseUrl =
+      'https://nominatim.openstreetmap.org/reverse';
+
   static const Duration geocodingTimeout = Duration(seconds: 12);
 
   /// User-Agent обязателен по правилам Nominatim.

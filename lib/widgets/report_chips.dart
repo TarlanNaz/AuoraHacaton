@@ -49,7 +49,7 @@ class ReportTypeChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: scheme.primaryContainer.withValues(alpha: 0.75),
+        color: AppTheme.brandBlueLight,
         borderRadius: BorderRadius.circular(AppTheme.radiusSm),
       ),
       child: Row(
@@ -63,7 +63,7 @@ class ReportTypeChip extends StatelessWidget {
               fontSize: 12,
               fontWeight: FontWeight.w600,
               height: 1.4,
-              color: scheme.onPrimaryContainer,
+              color: scheme.primary,
             ),
           ),
         ],

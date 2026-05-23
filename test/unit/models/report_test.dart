@@ -61,6 +61,24 @@ void main() {
       expect(cleared.submittedAt, created);
     });
 
+    test('persists location fields in JSON', () {
+      final r = Report(
+        id: 'loc-1',
+        rawText: 'заметки',
+        type: ReportType.incident,
+        status: ReportStatus.draft,
+        createdAt: DateTime.now(),
+        locationQuery: 'цех Б',
+        locationName: 'Мурманск, Россия',
+        locationLat: 68.95,
+        locationLon: 33.08,
+      );
+      final restored = Report.fromJson(r.toJson());
+      expect(restored.locationQuery, 'цех Б');
+      expect(restored.locationLat, closeTo(68.95, 0.01));
+      expect(restored.hasLocationCoords, isTrue);
+    });
+
     test('copyWith(clearRawText: true) wipes rawText', () {
       final r = Report(
         id: 'x',

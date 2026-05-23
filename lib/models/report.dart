@@ -19,6 +19,12 @@ class Report {
   final String? templateId;
   /// Комментарий руководителя при отклонении или замечания.
   final String? managerFeedback;
+  /// Текст в поле «Место / объект».
+  final String? locationQuery;
+  /// Адрес после геокодирования или GPS.
+  final String? locationName;
+  final double? locationLat;
+  final double? locationLon;
 
   const Report({
     required this.id,
@@ -32,6 +38,10 @@ class Report {
     this.workerName = WorkerProfile.defaultName,
     this.templateId,
     this.managerFeedback,
+    this.locationQuery,
+    this.locationName,
+    this.locationLat,
+    this.locationLon,
   });
 
   /// Обратная совместимость со старым UI/тестами.
@@ -42,6 +52,11 @@ class Report {
   bool get hasStructured => (finalText ?? '').isNotEmpty;
   bool get hasRawData => (rawText ?? '').isNotEmpty;
   bool get hasImages => imagePaths.isNotEmpty;
+
+  bool get hasLocationCoords => locationLat != null && locationLon != null;
+
+  bool get hasLocationData =>
+      (locationQuery ?? '').trim().isNotEmpty || hasLocationCoords;
 
   /// Для списков и фильтров руководителя (дата отправки).
   DateTime get submittedAt => sentAt ?? createdAt;
@@ -86,9 +101,14 @@ class Report {
     String? workerName,
     String? templateId,
     String? managerFeedback,
+    String? locationQuery,
+    String? locationName,
+    double? locationLat,
+    double? locationLon,
     bool clearRawText = false,
     bool clearManagerFeedback = false,
     bool clearSentAt = false,
+    bool clearLocation = false,
   }) {
     return Report(
       id: id ?? this.id,
@@ -104,6 +124,10 @@ class Report {
       managerFeedback: clearManagerFeedback
           ? null
           : (managerFeedback ?? this.managerFeedback),
+      locationQuery: clearLocation ? null : (locationQuery ?? this.locationQuery),
+      locationName: clearLocation ? null : (locationName ?? this.locationName),
+      locationLat: clearLocation ? null : (locationLat ?? this.locationLat),
+      locationLon: clearLocation ? null : (locationLon ?? this.locationLon),
     );
   }
 
@@ -120,6 +144,10 @@ class Report {
         'workerName': workerName,
         'templateId': templateId,
         'managerFeedback': managerFeedback,
+        if (locationQuery != null) 'locationQuery': locationQuery,
+        if (locationName != null) 'locationName': locationName,
+        if (locationLat != null) 'locationLat': locationLat,
+        if (locationLon != null) 'locationLon': locationLon,
         'isDraft': isDraft,
       };
 
@@ -152,6 +180,10 @@ class Report {
       workerName: json['workerName'] as String? ?? WorkerProfile.defaultName,
       templateId: json['templateId'] as String?,
       managerFeedback: json['managerFeedback'] as String?,
+      locationQuery: json['locationQuery'] as String?,
+      locationName: json['locationName'] as String?,
+      locationLat: (json['locationLat'] as num?)?.toDouble(),
+      locationLon: (json['locationLon'] as num?)?.toDouble(),
     );
   }
 }

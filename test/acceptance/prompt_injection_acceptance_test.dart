@@ -25,7 +25,7 @@ void main() {
       await tester.enterText(rawNotesTextField(), malicious);
       await tester.pump();
 
-      await tester.tap(find.text('Сгенерировать'));
+      await tapGenerateButton(tester);
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Редактируйте отчёт'), findsOneWidget);

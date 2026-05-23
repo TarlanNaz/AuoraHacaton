@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -8,6 +9,7 @@ import '../config/api_config.dart';
 import '../config/report_prompts.dart';
 import '../utils/app_logger.dart';
 import '../utils/input_validator.dart';
+import '../utils/network_errors.dart';
 
 /// Типизированная ошибка сетевого слоя — UI ловит её для отображения
 /// человекочитаемого сообщения и кнопки "Сохранить черновик локально".
@@ -91,16 +93,34 @@ class HttpGigaChatService implements GigaChatService {
         },
         body: {'scope': scope},
       ).timeout(ApiConfig.oauthTimeout);
-    } on SocketException catch (e) {
-      AppLogger.warn(_tag, 'oauth socket error', e);
+    } on SocketException catch (e, st) {
+      AppLogger.error(_tag, 'oauth socket error', error: e, stackTrace: st);
       throw GigaChatException(
-          'Нет интернета: невозможно получить access-токен GigaChat.');
+        describeNetworkFailure(e, service: 'OAuth GigaChat'),
+      );
+    } on HandshakeException catch (e, st) {
+      AppLogger.error(_tag, 'oauth tls handshake', error: e, stackTrace: st);
+      throw GigaChatException(
+        describeNetworkFailure(e, service: 'OAuth GigaChat'),
+      );
+    } on TlsException catch (e, st) {
+      AppLogger.error(_tag, 'oauth tls', error: e, stackTrace: st);
+      throw GigaChatException(
+        describeNetworkFailure(e, service: 'OAuth GigaChat'),
+      );
+    } on TimeoutException catch (e) {
+      AppLogger.warn(_tag, 'oauth timeout', e);
+      throw GigaChatException(
+        describeNetworkFailure(e, service: 'OAuth GigaChat'),
+      );
     } on HttpException catch (e) {
       AppLogger.warn(_tag, 'oauth http error', e);
       throw GigaChatException('Сетевая ошибка при обращении к OAuth.');
     } catch (e, st) {
       AppLogger.error(_tag, 'oauth failed', error: e, stackTrace: st);
-      throw GigaChatException('Сбой OAuth GigaChat: $e');
+      throw GigaChatException(
+        'Сбой OAuth GigaChat: ${describeNetworkFailure(e, service: 'OAuth GigaChat')}',
+      );
     }
 
     if (response.statusCode == 401 || response.statusCode == 403) {
@@ -258,16 +278,29 @@ class HttpGigaChatService implements GigaChatService {
             body: body,
           )
           .timeout(ApiConfig.chatTimeout);
-    } on SocketException catch (e) {
-      AppLogger.warn(_tag, 'chat socket error', e);
+    } on SocketException catch (e, st) {
+      AppLogger.error(_tag, 'chat socket error', error: e, stackTrace: st);
       throw GigaChatException(
-          'Нет интернета. Проверьте соединение или сохраните черновик.');
+        describeNetworkFailure(e, service: 'GigaChat'),
+      );
+    } on HandshakeException catch (e, st) {
+      AppLogger.error(_tag, 'chat tls handshake', error: e, stackTrace: st);
+      throw GigaChatException(
+        describeNetworkFailure(e, service: 'GigaChat'),
+      );
+    } on TimeoutException catch (e) {
+      AppLogger.warn(_tag, 'chat timeout', e);
+      throw GigaChatException(
+        describeNetworkFailure(e, service: 'GigaChat'),
+      );
     } on HttpException catch (e) {
       AppLogger.warn(_tag, 'chat http error', e);
       throw GigaChatException('Сетевая ошибка при обращении к GigaChat.');
     } catch (e, st) {
       AppLogger.error(_tag, 'chat call failed', error: e, stackTrace: st);
-      throw GigaChatException('Ошибка соединения: $e');
+      throw GigaChatException(
+        describeNetworkFailure(e, service: 'GigaChat'),
+      );
     }
 
     if (response.statusCode == 401 || response.statusCode == 403) {

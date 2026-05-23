@@ -74,7 +74,7 @@ void main() {
       );
     });
 
-    test('maps SocketException to "нет интернета"', () async {
+    test('maps SocketException to readable network message', () async {
       final mockClient = MockClient((req) async {
         throw const SocketException('offline');
       });
@@ -88,7 +88,7 @@ void main() {
         throwsA(isA<GigaChatException>().having(
           (e) => e.message,
           'message',
-          contains('Нет интернета'),
+          contains('Сетевая ошибка'),
         )),
       );
     });

@@ -92,6 +92,21 @@ class FakeStorageService implements StorageService {
   @override
   Future<void> setMockInboxSeeded() async => _mockSeeded = true;
 
+  bool _demoManagerSeeded = false;
+  bool _demoWorkerSeeded = false;
+
+  @override
+  Future<bool> isDemoManagerSeeded() async => _demoManagerSeeded;
+
+  @override
+  Future<void> setDemoManagerSeeded() async => _demoManagerSeeded = true;
+
+  @override
+  Future<bool> isDemoWorkerSeeded() async => _demoWorkerSeeded;
+
+  @override
+  Future<void> setDemoWorkerSeeded() async => _demoWorkerSeeded = true;
+
   @override
   Future<WorkerProfile?> loadWorkerProfile() async => _profile;
 

@@ -114,21 +114,22 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primaryContainer,
+                          color: AppTheme.demoPanelBackground,
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppTheme.cardBorder),
                         ),
                         child: Row(
                           children: [
                             Icon(
                               Icons.info_outline,
-                              color: theme.colorScheme.onPrimaryContainer,
+                              color: theme.colorScheme.primary,
                             ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 'Данные профиля закреплены. Изменить их напрямую нельзя.',
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onPrimaryContainer,
+                                  color: AppTheme.textPrimary,
                                 ),
                               ),
                             ),

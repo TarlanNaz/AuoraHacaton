@@ -1,7 +1,7 @@
 name: structurator
 description: "Структуратор — оффлайн-первый помощник полевого сотрудника. Преобразует сырые заметки в структурированные отчёты через GigaChat."
 publish_to: "none"
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -20,6 +20,7 @@ dependencies:
   image_picker: ^1.1.2
   path_provider: ^2.1.4
   path: ^1.9.0
+  geolocator: ^14.0.2
 
 dev_dependencies:
   flutter_test:

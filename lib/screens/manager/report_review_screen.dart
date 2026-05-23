@@ -130,6 +130,32 @@ class ReportReviewScreen extends StatelessWidget {
                     ),
                   ),
                 ],
+                if (current.hasLocationData) ...[
+                  const SizedBox(height: 12),
+                  AppCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Место объекта', style: theme.textTheme.titleSmall),
+                        const SizedBox(height: 8),
+                        Text(
+                          current.locationName ??
+                              current.locationQuery ??
+                              '—',
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                        if (current.hasLocationCoords) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Координаты: ${current.locationLat!.toStringAsFixed(5)}, '
+                            '${current.locationLon!.toStringAsFixed(5)}',
+                            style: theme.textTheme.labelMedium,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 AppCard(
                   child: Column(

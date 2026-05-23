@@ -73,6 +73,22 @@ lib/
 | **[docs/TOOLS_ROADMAP.md](docs/TOOLS_ROADMAP.md)** | Идеи развития (голос, OCR, корпоративный бэкенд) |
 | **[AGENTS.md](AGENTS.md)** | Контракт для AI-агентов, DAE/ATDD |
 
+## Production-сборка
+
+```powershell
+# Windows — тесты + APK + AAB (нужен заполненный .env)
+.\scripts\build-prod.ps1
+```
+
+```bash
+# Linux / macOS
+./scripts/build-prod.sh
+```
+
+Артефакты: `build/app/outputs/flutter-apk/app-release.apk`, `build/app/outputs/bundle/release/app-release.aab`.
+
+В release нет подсказки с паролями на экране входа и автозагрузки демо-входящих у руководителя. Подробнее — **[docs/BUILD_PRODUCTION.md](docs/BUILD_PRODUCTION.md)**.
+
 ## Тесты и анализ
 
 ```bash

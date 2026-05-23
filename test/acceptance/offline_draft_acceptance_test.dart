@@ -27,7 +27,7 @@ void main() {
       await tester.pump(ReportPrompts.draftAutosaveDebounce);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Сгенерировать'));
+      await tapGenerateButton(tester);
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Нет интернета'), findsWidgets);

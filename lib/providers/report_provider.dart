@@ -9,6 +9,7 @@ import '../models/worker_report_stats.dart';
 import '../models/worker_summary.dart';
 import '../services/giga_chat_service.dart';
 import '../services/image_storage_service.dart';
+import '../services/demo_data_seeder.dart';
 import '../services/mock_report_api_service.dart';
 import '../services/storage_service.dart';
 import '../utils/app_logger.dart';
@@ -75,6 +76,13 @@ class ReportProvider extends ChangeNotifier {
       .toList()
     ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
 
+  Future<void> seedWorkerDemoIfNeeded() async {
+    await DemoDataSeeder(_storage, _images).seedWorkerReportsIfNeeded();
+    _workerReports = await _storage.loadReports();
+    _workerReports.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+    notifyListeners();
+  }
+
   Future<void> init({bool seedManagerMock = false}) async {
     _isInitializing = true;
     _initError = null;
@@ -88,7 +96,7 @@ class ReportProvider extends ChangeNotifier {
       _manualToken = await _storage.readManualToken();
 
       if (seedManagerMock) {
-        await MockInboxSeeder(_storage, _images).seedIfNeeded();
+        await DemoDataSeeder(_storage, _images).seedManagerInboxIfNeeded();
         _managerInbox = await _storage.loadManagerInbox();
       }
 
@@ -140,11 +148,21 @@ class ReportProvider extends ChangeNotifier {
     required String workerName,
     List<String> imagePaths = const [],
     String? templateId,
+    String? locationQuery,
+    String? locationName,
+    double? locationLat,
+    double? locationLon,
   }) async {
     final trimmedRaw = rawText.trim();
     final trimmedFinal = (finalText ?? '').trim();
-    final hasContent =
-        trimmedRaw.isNotEmpty || trimmedFinal.isNotEmpty || imagePaths.isNotEmpty;
+    final hasLocation = (locationQuery ?? '').trim().isNotEmpty ||
+        (locationName ?? '').trim().isNotEmpty ||
+        locationLat != null ||
+        locationLon != null;
+    final hasContent = trimmedRaw.isNotEmpty ||
+        trimmedFinal.isNotEmpty ||
+        imagePaths.isNotEmpty ||
+        hasLocation;
     if (!hasContent) return null;
 
     final storedRaw = trimmedRaw.isEmpty && imagePaths.isNotEmpty
@@ -171,6 +189,10 @@ class ReportProvider extends ChangeNotifier {
         workerName: workerName,
         status: ReportStatus.draft,
         templateId: templateId,
+        locationQuery: locationQuery ?? prev.locationQuery,
+        locationName: locationName ?? prev.locationName,
+        locationLat: locationLat ?? prev.locationLat,
+        locationLon: locationLon ?? prev.locationLon,
         clearManagerFeedback: true,
         clearRawText: omitRaw,
       );
@@ -187,6 +209,12 @@ class ReportProvider extends ChangeNotifier {
           imagePaths: List.from(imagePaths),
           workerName: workerName,
           templateId: templateId,
+          locationQuery: (locationQuery ?? '').trim().isEmpty
+              ? null
+              : locationQuery!.trim(),
+          locationName: locationName,
+          locationLat: locationLat,
+          locationLon: locationLon,
         ),
       );
     }

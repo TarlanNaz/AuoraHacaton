@@ -11,7 +11,7 @@ class AuthStubs {
 
   static const workerDisplayName = 'Иванов Алексей Петрович';
   static const workerEmployer = 'АО «Пульс Авроры», Северный филиал';
-  static const managerDisplayName = 'Руководитель (демо)';
+  static const managerDisplayName = 'Смирнова Елена Андреевна';
 
   static List<({String login, String password, UserRole role, String name})>
       get seedAccounts => [

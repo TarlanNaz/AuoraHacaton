@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
+import '../../config/app_config.dart';
 import '../../config/auth_stubs.dart';
 import '../../models/user_role.dart';
 import '../../providers/auth_provider.dart';
@@ -121,9 +122,8 @@ class _LoginFormState extends State<_LoginForm> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -137,29 +137,32 @@ class _LoginFormState extends State<_LoginForm> {
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: scheme.primaryContainer.withValues(alpha: 0.45),
-            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.info_outline, size: 18, color: scheme.primary),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  AuthStubs.hintText(),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onPrimaryContainer,
-                      ),
+        if (AppConfig.showDemoLoginHint) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.demoPanelBackground,
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              border: Border.all(color: AppTheme.cardBorder),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline, size: 18, color: scheme.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    AuthStubs.hintText(),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.textSecondary,
+                        ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 20),
+          const SizedBox(height: 20),
+        ],
         TextField(
           controller: _login,
           decoration: const InputDecoration(
@@ -207,10 +210,15 @@ class _LoginFormState extends State<_LoginForm> {
 
 Future<void> _afterAuth(BuildContext context) async {
   final role = context.read<AuthProvider>().role;
+  final reports = context.read<ReportProvider>();
+
   if (role == UserRole.manager) {
     await context.read<TemplateProvider>().ensureOnePerReportType();
-    await context.read<ReportProvider>().init(seedManagerMock: true);
+    await reports.init(seedManagerMock: AppConfig.seedManagerDemoInbox);
+  } else if (role == UserRole.worker && AppConfig.seedWorkerDemoReports) {
+    await reports.seedWorkerDemoIfNeeded();
   }
+
   if (context.mounted) {
     UiFeedback.info(context, 'Добро пожаловать');
   }

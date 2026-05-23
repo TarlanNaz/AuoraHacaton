@@ -25,9 +25,35 @@ Finder rawNotesTextField() => find.byWidgetPredicate(
       (w) => w is TextField && w.decoration?.labelText == 'Сырые заметки',
     );
 
+/// Кнопка «Сгенерировать» уходит ниже fold после блока геолокации — прокручиваем.
+Future<void> tapGenerateButton(WidgetTester tester) async {
+  final btn = find.text('Сгенерировать');
+  await tester.scrollUntilVisible(
+    btn,
+    120,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.ensureVisible(btn);
+  await tester.tap(btn);
+  await tester.pumpAndSettle();
+}
+
 class FakeLocationService implements LocationService {
+  static const _demoPlace = GeoPlace(
+    displayName: 'Тестовое место',
+    latitude: 68.97,
+    longitude: 33.09,
+  );
+
   @override
-  Future<GeoPlace?> searchPlace(String query) async => null;
+  Future<GeoPlace?> searchPlace(String query) async => _demoPlace;
+
+  @override
+  Future<GeoPlace> getCurrentPosition() async => _demoPlace;
+
+  @override
+  Future<GeoPlace?> reverseGeocode(double latitude, double longitude) async =>
+      _demoPlace;
 }
 
 class FakeMockReportApi implements MockReportApiService {

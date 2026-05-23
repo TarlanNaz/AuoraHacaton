@@ -33,6 +33,12 @@ abstract class StorageService {
   Future<bool> isMockInboxSeeded();
   Future<void> setMockInboxSeeded();
 
+  Future<bool> isDemoManagerSeeded();
+  Future<void> setDemoManagerSeeded();
+
+  Future<bool> isDemoWorkerSeeded();
+  Future<void> setDemoWorkerSeeded();
+
   Future<WorkerProfile?> loadWorkerProfile();
   Future<void> saveWorkerProfile(WorkerProfile profile);
 
@@ -156,6 +162,30 @@ class SharedPrefsStorageService implements StorageService {
   Future<void> setMockInboxSeeded() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(StorageKeys.mockSeeded, true);
+  }
+
+  @override
+  Future<bool> isDemoManagerSeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(StorageKeys.demoManagerSeeded) ?? false;
+  }
+
+  @override
+  Future<void> setDemoManagerSeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(StorageKeys.demoManagerSeeded, true);
+  }
+
+  @override
+  Future<bool> isDemoWorkerSeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(StorageKeys.demoWorkerSeeded) ?? false;
+  }
+
+  @override
+  Future<void> setDemoWorkerSeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(StorageKeys.demoWorkerSeeded, true);
   }
 
   @override

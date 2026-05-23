@@ -1,25 +1,31 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-/// B2B/B2G палитра: off-white фон, белые карточки, синий primary,
-/// графитовый текст, семантика warning / success / error.
+/// B2B/B2G палитра: off-white фон, белые карточки, синий primary.
+/// Текст — чёрный: на Aurora OS серый Material иначе рисуется «как в Windows».
 class AppTheme {
   AppTheme._();
 
   /// Минимальный размер зоны нажатия для полевой работы (перчатки, холод).
   static const double minTouchTarget = 48;
 
-  // ─── Фон и поверхности ───────────────────────────────────────────────────
-  static const Color scaffoldBackground = Color(0xFFF5F7FA);
+  // ─── Фон и поверхности (светлая «белая» демо-тема для Aurora) ────────────
+  static const Color scaffoldBackground = Color(0xFFFFFFFF);
   static const Color surfaceWhite = Color(0xFFFFFFFF);
-  static const Color surfaceGrayMuted = Color(0xFFECEFF1);
+  static const Color surfaceGrayMuted = Color(0xFFF5F5F5);
+  static const Color demoPanelBackground = Color(0xFFFAFAFA);
+  static const Color cardBorder = Color(0xFFEEEEEE);
+
+  // ─── Текст (высокий контраст для Aurora / Qt) ────────────────────────────
+  static const Color textPrimary = Color(0xFF000000);
+  static const Color textSecondary = Color(0xFF212121);
 
   // ─── Бренд: navy + deep blue ─────────────────────────────────────────────
   static const Color brandNavy = Color(0xFF1A2B4A);
   static const Color brandBlue = Color(0xFF1565C0);
-  static const Color brandBlueLight = Color(0xFFE3F2FD);
-  static const Color brandDarkGray = Color(0xFF546E7A);
-  static const Color brandText = Color(0xFF263238);
+  static const Color brandBlueLight = Color(0xFFF0F7FF);
+  static const Color brandDarkGray = textSecondary;
+  static const Color brandText = textPrimary;
 
   // ─── Семантика ───────────────────────────────────────────────────────────
   static const Color warningAmber = Color(0xFFFF8F00);
@@ -51,12 +57,12 @@ class AppTheme {
       brightness: Brightness.light,
       primary: brandBlue,
       onPrimary: surfaceWhite,
-      primaryContainer: brandBlueLight,
+      primaryContainer: surfaceWhite,
       onPrimaryContainer: Color(0xFF0D47A1),
       secondary: brandDarkGray,
       onSecondary: surfaceWhite,
-      secondaryContainer: surfaceGrayMuted,
-      onSecondaryContainer: brandText,
+      secondaryContainer: demoPanelBackground,
+      onSecondaryContainer: textPrimary,
       tertiary: warningOrange,
       onTertiary: surfaceWhite,
       tertiaryContainer: warningOrangeLight,
@@ -66,10 +72,10 @@ class AppTheme {
       errorContainer: errorRedLight,
       onErrorContainer: Color(0xFFB71C1C),
       surface: scaffoldBackground,
-      onSurface: brandText,
-      onSurfaceVariant: brandDarkGray,
+      onSurface: textPrimary,
+      onSurfaceVariant: textSecondary,
       outline: Color(0xFF90A4AE),
-      outlineVariant: Color(0xFFCFD8DC),
+      outlineVariant: cardBorder,
       shadow: Colors.black26,
       scrim: Colors.black54,
       inverseSurface: brandNavy,
@@ -77,18 +83,20 @@ class AppTheme {
       inversePrimary: brandBlueLight,
       surfaceTint: brandBlue,
       surfaceContainerHighest: surfaceGrayMuted,
-      surfaceContainerHigh: Color(0xFFE8EEF2),
+      surfaceContainerHigh: demoPanelBackground,
       surfaceContainer: scaffoldBackground,
-      surfaceContainerLow: Color(0xFFFAFBFC),
+      surfaceContainerLow: surfaceWhite,
       surfaceContainerLowest: surfaceWhite,
       surfaceBright: surfaceWhite,
-      surfaceDim: Color(0xFFE0E4E8),
+      surfaceDim: Color(0xFFF0F0F0),
     );
 
     final textTheme = _textTheme(scheme);
 
     return _baseTheme(scheme, textTheme).copyWith(
       scaffoldBackgroundColor: scaffoldBackground,
+      applyElevationOverlayColor: false,
+      dividerColor: const Color(0xFFBDBDBD),
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
@@ -143,13 +151,13 @@ class AppTheme {
         unselectedLabelColor: Colors.white70,
       ),
       cardTheme: CardThemeData(
-        elevation: 2,
-        shadowColor: scheme.shadow,
+        elevation: 1,
+        shadowColor: Colors.black12,
         color: surfaceWhite,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusMd),
-          side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.6)),
+          side: const BorderSide(color: cardBorder),
         ),
         margin: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
@@ -249,23 +257,23 @@ class AppTheme {
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        hintStyle: TextStyle(
-          color: scheme.onSurfaceVariant.withValues(alpha: 0.85),
+        hintStyle: const TextStyle(
+          color: textSecondary,
           height: 1.45,
         ),
-        labelStyle: TextStyle(color: scheme.onSurfaceVariant, height: 1.4),
+        labelStyle: const TextStyle(color: textPrimary, height: 1.4),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: scheme.surfaceContainerHigh,
+        backgroundColor: demoPanelBackground,
         side: BorderSide.none,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusSm),
         ),
-        labelStyle: TextStyle(
+        labelStyle: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w500,
           height: 1.4,
-          color: scheme.onSurface,
+          color: textPrimary,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 4),
       ),
@@ -310,11 +318,16 @@ class AppTheme {
   }
 
   static ThemeData _baseTheme(ColorScheme scheme, TextTheme textTheme) {
+    final applied = textTheme.apply(
+      bodyColor: textPrimary,
+      displayColor: textPrimary,
+    );
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       fontFamily: 'Roboto',
-      textTheme: textTheme,
+      textTheme: applied,
+      primaryTextTheme: applied,
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: CupertinoPageTransitionsBuilder(),
@@ -325,66 +338,69 @@ class AppTheme {
     );
   }
 
-  static TextTheme _textTheme(ColorScheme scheme) {
+  static TextTheme _textTheme(ColorScheme _) {
+    const primary = textPrimary;
+    const secondary = textSecondary;
+
     return TextTheme(
       headlineMedium: TextStyle(
         fontSize: 28,
         fontWeight: FontWeight.w600,
-        color: scheme.onSurface,
+        color: primary,
         letterSpacing: -0.4,
         height: 1.35,
       ),
       headlineSmall: TextStyle(
         fontSize: 22,
         fontWeight: FontWeight.w600,
-        color: scheme.onSurface,
+        color: primary,
         letterSpacing: -0.25,
         height: 1.4,
       ),
       titleLarge: TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.w600,
-        color: scheme.onSurface,
+        color: primary,
         height: 1.45,
       ),
       titleMedium: TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w600,
-        color: scheme.onSurface,
+        color: primary,
         height: 1.45,
       ),
       titleSmall: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w600,
-        color: scheme.onSurface,
+        color: primary,
         height: 1.45,
       ),
       bodyLarge: TextStyle(
         fontSize: 16,
         height: 1.5,
-        color: scheme.onSurface,
+        color: primary,
       ),
       bodyMedium: TextStyle(
         fontSize: 14,
         height: 1.5,
-        color: scheme.onSurface,
+        color: primary,
       ),
       bodySmall: TextStyle(
         fontSize: 13,
         height: 1.45,
-        color: scheme.onSurfaceVariant,
+        color: secondary,
       ),
       labelLarge: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w600,
         height: 1.4,
-        color: scheme.onSurfaceVariant,
+        color: primary,
       ),
       labelMedium: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w500,
         height: 1.4,
-        color: scheme.onSurfaceVariant,
+        color: secondary,
       ),
     );
   }
