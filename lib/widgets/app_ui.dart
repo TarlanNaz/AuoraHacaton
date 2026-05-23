@@ -12,9 +12,9 @@ class AuroraGradient {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      AppTheme.auroraDeep,
-      AppTheme.auroraNavy,
-      Color(0xFF1E4D6B),
+      AppTheme.brandNavy,
+      AppTheme.brandBlue,
+      Color(0xFF0D47A1),
     ],
     stops: [0.0, 0.55, 1.0],
   );
@@ -22,7 +22,7 @@ class AuroraGradient {
   static const LinearGradient accent = LinearGradient(
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
-    colors: [AppTheme.auroraTeal, AppTheme.auroraMint],
+    colors: [AppTheme.accentOrange, AppTheme.accentAmber],
   );
 }
 
@@ -52,10 +52,13 @@ class AppCard extends StatelessWidget {
 
     final card = Material(
       color: backgroundColor ?? scheme.surfaceContainerLowest,
-      elevation: 0,
+      elevation: 2,
+      shadowColor: scheme.shadow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        side: BorderSide(color: borderColor ?? scheme.outlineVariant),
+        side: BorderSide(
+          color: borderColor ?? scheme.outlineVariant.withValues(alpha: 0.55),
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: onTap != null
@@ -243,19 +246,29 @@ class AppReportTile extends StatelessWidget {
           if (leading != null) ...[
             leading!,
             const SizedBox(width: 12),
-          ] else
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: scheme.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                report.type.icon,
-                color: scheme.primary,
-                size: 22,
-              ),
+          ]           else
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    report.type.icon,
+                    color: scheme.primary,
+                    size: 22,
+                  ),
+                ),
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: ReportStatusDot(status: report.status),
+                ),
+              ],
             ),
           const SizedBox(width: 12),
           Expanded(
@@ -321,20 +334,20 @@ class _PhotoBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: scheme.tertiary.withValues(alpha: 0.12),
+        color: scheme.primaryContainer.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.photo_outlined, size: 14, color: scheme.tertiary),
+          Icon(Icons.photo_outlined, size: 14, color: scheme.primary),
           const SizedBox(width: 4),
           Text(
             'Фото',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: scheme.tertiary,
+              color: scheme.primary,
             ),
           ),
         ],

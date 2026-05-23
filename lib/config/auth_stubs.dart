@@ -10,6 +10,7 @@ class AuthStubs {
   static const managerPassword = 'manager123';
 
   static const workerDisplayName = 'Иванов Алексей Петрович';
+  static const workerEmployer = 'АО «Пульс Авроры», Северный филиал';
   static const managerDisplayName = 'Руководитель (демо)';
 
   static List<({String login, String password, UserRole role, String name})>

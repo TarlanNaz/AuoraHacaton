@@ -27,7 +27,7 @@ class TemplatesScreen extends StatelessWidget {
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Новый шаблон'),
                 style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(46),
+                  minimumSize: const Size.fromHeight(AppTheme.minTouchTarget),
                 ),
               ),
             ),
@@ -127,6 +127,7 @@ class TemplatesScreen extends StatelessWidget {
                   initialValue: type,
                   decoration: const InputDecoration(labelText: 'Тип отчёта'),
                   items: ReportType.values
+                      .where((t) => !t.isProfileChange)
                       .map((t) =>
                           DropdownMenuItem(value: t, child: Text(t.label)))
                       .toList(),

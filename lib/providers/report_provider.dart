@@ -73,7 +73,7 @@ class ReportProvider extends ChangeNotifier {
   List<Report> reportsForWorker(String workerName) => _managerInbox
       .where((r) => r.workerName == workerName)
       .toList()
-    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
 
   Future<void> init({bool seedManagerMock = false}) async {
     _isInitializing = true;
@@ -82,9 +82,9 @@ class ReportProvider extends ChangeNotifier {
 
     try {
       _workerReports = await _storage.loadReports();
-      _workerReports.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _workerReports.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
       _managerInbox = await _storage.loadManagerInbox();
-      _managerInbox.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _managerInbox.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
       _manualToken = await _storage.readManualToken();
 
       if (seedManagerMock) {
@@ -106,8 +106,8 @@ class ReportProvider extends ChangeNotifier {
   Future<void> _refreshAfterSync() async {
     _workerReports = await _storage.loadReports();
     _managerInbox = await _storage.loadManagerInbox();
-    _workerReports.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    _managerInbox.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _workerReports.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+      _managerInbox.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
   }
 
   Future<String> ensureToken() async {
@@ -270,17 +270,22 @@ class ReportProvider extends ChangeNotifier {
     final idx = _workerReports.indexWhere((r) => r.id == reportId);
     if (idx == -1) return false;
 
+    final sentAt = DateTime.now();
     final report = _workerReports[idx].copyWith(
       status: ReportStatus.sent,
+      sentAt: sentAt,
       clearRawText: true,
       clearManagerFeedback: true,
     );
 
     final delivered = await _mockApi.submitToManager(report);
 
-    _workerReports[idx] = report.copyWith(
-      status: delivered ? ReportStatus.sent : ReportStatus.draft,
-    );
+    _workerReports[idx] = delivered
+        ? report
+        : report.copyWith(
+            status: ReportStatus.draft,
+            clearSentAt: true,
+          );
     await _storage.saveReports(_workerReports);
     notifyListeners();
     return delivered;

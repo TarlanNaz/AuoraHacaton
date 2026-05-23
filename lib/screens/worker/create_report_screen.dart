@@ -4,14 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../config/app_theme.dart';
 import '../../config/report_prompts.dart';
 import '../../config/sample_inputs.dart';
+import '../../models/geo_place.dart';
 import '../../models/report_type.dart';
 import '../../providers/generation_provider.dart';
 import '../../providers/report_provider.dart';
 import '../../providers/template_provider.dart';
 import '../../providers/worker_profile_provider.dart';
 import '../../services/image_storage_service.dart';
+import '../../services/location_service.dart';
 import '../../utils/draft_autosave.dart';
 import '../../utils/ui_feedback.dart';
 import '../../widgets/app_ui.dart';
@@ -24,14 +27,12 @@ class CreateReportScreen extends StatefulWidget {
     this.initialImagePaths = const [],
     this.initialType,
     this.reportId,
-    this.profileChangeRequest = false,
   });
 
   final String? initialText;
   final List<String> initialImagePaths;
   final ReportType? initialType;
   final String? reportId;
-  final bool profileChangeRequest;
 
   @override
   State<CreateReportScreen> createState() => _CreateReportScreenState();
@@ -40,10 +41,13 @@ class CreateReportScreen extends StatefulWidget {
 class _CreateReportScreenState extends State<CreateReportScreen> {
   late final TextEditingController _rawController;
   late final TextEditingController _resultController;
+  late final TextEditingController _locationController;
   late ReportType _type;
   late List<String> _imageNames;
   String? _savedReportId;
   bool _sending = false;
+  bool _geocoding = false;
+  GeoPlace? _resolvedPlace;
 
   late final DraftAutosave _autosave;
   AutosaveUiState _autosaveUi = AutosaveUiState.idle;
@@ -54,6 +58,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     super.initState();
     _rawController = TextEditingController(text: widget.initialText ?? '');
     _resultController = TextEditingController();
+    _locationController = TextEditingController();
     _type = widget.initialType ?? ReportType.incident;
     _imageNames = List.from(widget.initialImagePaths);
     _savedReportId = widget.reportId;
@@ -76,6 +81,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     _autosave.dispose();
     _rawController.dispose();
     _resultController.dispose();
+    _locationController.dispose();
     super.dispose();
   }
 
@@ -138,6 +144,12 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     return files;
   }
 
+  String? _locationPromptContext() {
+    final place = _resolvedPlace;
+    if (place == null) return null;
+    return '${place.displayName} (координаты: ${place.coordinatesLabel})';
+  }
+
   String _systemPrompt() {
     final tpl = context.read<TemplateProvider>().instructionForType(_type);
     final name = context.read<WorkerProfileProvider>().profile.fullName;
@@ -146,7 +158,40 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       templateInstruction: tpl,
       imageCount: _imageNames.length,
       workerName: name,
+      locationContext: _locationPromptContext(),
     );
+  }
+
+  Future<void> _resolveLocation() async {
+    final query = _locationController.text.trim();
+    if (query.length < 3) {
+      UiFeedback.warning(context, 'Введите место не короче 3 символов');
+      return;
+    }
+
+    setState(() => _geocoding = true);
+    try {
+      final place =
+          await context.read<LocationService>().searchPlace(query);
+      if (!mounted) return;
+      if (place == null) {
+        setState(() {
+          _resolvedPlace = null;
+          _geocoding = false;
+        });
+        UiFeedback.warning(context, 'Место не найдено. Уточните запрос.');
+        return;
+      }
+      setState(() {
+        _resolvedPlace = place;
+        _geocoding = false;
+      });
+      UiFeedback.info(context, 'Место уточнено через OpenStreetMap');
+    } on LocationException catch (e) {
+      if (!mounted) return;
+      setState(() => _geocoding = false);
+      UiFeedback.warning(context, e.message);
+    }
   }
 
   Future<void> _generate() async {
@@ -268,13 +313,9 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         if (didPop) await _autosave.flush();
       },
       child: Scaffold(
-        backgroundColor: Theme.of(context).colorScheme.surface,
+        backgroundColor: AppTheme.scaffoldBackground,
         appBar: AppBar(
-          title: Text(
-            widget.profileChangeRequest
-                ? 'Запрос на изменение данных'
-                : 'Создание отчёта',
-          ),
+          title: const Text('Создание отчёта'),
           flexibleSpace: Container(
             decoration: const BoxDecoration(gradient: AuroraGradient.header),
           ),
@@ -295,26 +336,14 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
           ],
         ),
         body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Column(
             children: [
-              if (widget.profileChangeRequest)
-                AppCard(
-                  backgroundColor:
-                      Theme.of(context).colorScheme.primaryContainer,
-                  borderColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-                  padding: const EdgeInsets.all(12),
-                  child: Text(
-                    'Опишите, какие данные в профиле неверны и как должно быть '
-                    'правильно. Отчёт уйдёт руководителю на согласование.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        ),
-                  ),
-                ),
-              if (widget.profileChangeRequest) const SizedBox(height: 12),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
               DropdownButtonFormField<ReportType>(
                   value: _type,
                   decoration: const InputDecoration(
@@ -322,15 +351,72 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                     border: OutlineInputBorder(),
                   ),
                   items: ReportType.values
+                      .where((t) => !t.isProfileChange)
                       .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
                       .toList(),
                   onChanged: _onTypeChanged,
                 ),
                 const SizedBox(height: 12),
-              if (!widget.profileChangeRequest) ...[
-                _SamplesStrip(type: _type, onPick: _applySample),
+                TextField(
+                  controller: _locationController,
+                  decoration: InputDecoration(
+                    labelText: 'Место / объект',
+                    hintText: 'Напр. цех Б, узел №4, Мурманск',
+                    prefixIcon: const Icon(Icons.place_outlined),
+                    suffixIcon: _geocoding
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : IconButton(
+                            tooltip: 'Уточнить на карте (API 2)',
+                            icon: const Icon(Icons.map_outlined),
+                            onPressed: _geocoding ? null : _resolveLocation,
+                          ),
+                  ),
+                  onSubmitted: (_) => _resolveLocation(),
+                ),
+                if (_resolvedPlace != null) ...[
+                  const SizedBox(height: 8),
+                  AppCard(
+                    padding: const EdgeInsets.all(12),
+                    backgroundColor:
+                        Theme.of(context).colorScheme.secondaryContainer,
+                    borderColor: Theme.of(context)
+                        .colorScheme
+                        .secondary
+                        .withValues(alpha: 0.3),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _resolvedPlace!.displayName,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          onPressed: () =>
+                              setState(() => _resolvedPlace = null),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
-              ],
+              _SamplesStrip(type: _type, onPick: _applySample),
+              const SizedBox(height: 12),
                 AttachedImagesPanel(
                   imageNames: _imageNames,
                   imageStorage: context.read<ImageStorageService>(),
@@ -362,15 +448,19 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Expanded(child: _ResultArea(controller: _resultController)),
-                const SizedBox(height: 8),
-                Consumer<GenerationProvider>(
+                SizedBox(
+                  height: 220,
+                  child: _ResultArea(controller: _resultController),
+                ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Consumer<GenerationProvider>(
                   builder: (context, gen, _) {
-                    if (gen.status != GenerationStatus.success &&
-                        gen.status != GenerationStatus.error) {
-                      return const SizedBox.shrink();
-                    }
-                    if (gen.status == GenerationStatus.error) {
+                    if (gen.status != GenerationStatus.success) {
                       return const SizedBox.shrink();
                     }
                     return FilledButton.icon(
@@ -386,8 +476,8 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                     );
                   },
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

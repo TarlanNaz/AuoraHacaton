@@ -24,7 +24,7 @@ void main() {
       const rawNotes =
           'Данные для отчета Гришиной В.Б.: обработано 45 метрик, '
           'эффективность выросла, нужно добавить диаграммы';
-      await tester.enterText(find.byType(TextField).first, rawNotes);
+      await tester.enterText(rawNotesTextField(), rawNotes);
       await tester.pump();
 
       await tester.tap(find.text('Сгенерировать'));

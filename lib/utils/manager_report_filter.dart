@@ -41,7 +41,8 @@ extension ManagerReportFilterX on List<Report> {
     return where((r) {
       if (filter.type != null && r.type != filter.type) return false;
 
-      final day = DateTime(r.createdAt.year, r.createdAt.month, r.createdAt.day);
+      final sent = r.submittedAt;
+      final day = DateTime(sent.year, sent.month, sent.day);
       if (filter.dateFrom != null) {
         final from = DateTime(
           filter.dateFrom!.year,

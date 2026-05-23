@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../config/app_theme.dart';
 import '../../models/report.dart';
 import '../../models/report_status.dart';
 import '../../providers/report_provider.dart';
@@ -9,6 +10,7 @@ import '../../services/image_storage_service.dart';
 import '../../utils/ui_feedback.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/report_chips.dart';
+import '../../widgets/profile_change_report_view.dart';
 import '../../widgets/report_images_gallery.dart';
 
 class ReportReviewScreen extends StatelessWidget {
@@ -20,14 +22,15 @@ class ReportReviewScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final df = DateFormat('dd.MM.yyyy · HH:mm');
+    final isProfileChange = report.type.isProfileChange;
     final canReview = report.status == ReportStatus.sent;
     final imageStorage = context.read<ImageStorageService>();
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: AppTheme.scaffoldBackground,
       appBar: AppBar(
         title: Text(
-          report.title,
+          isProfileChange ? 'Изменение данных' : report.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -45,90 +48,99 @@ class ReportReviewScreen extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        ReportTypeChip(type: current.type),
-                        ReportStatusChip(status: current.status),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.person_outline,
-                          size: 18,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            current.workerName,
-                            style: theme.textTheme.titleSmall,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      df.format(current.createdAt),
-                      style: theme.textTheme.labelMedium,
-                    ),
-                  ],
-                ),
-              ),
-              if (current.hasImages) ...[
-                const SizedBox(height: 12),
+              if (!isProfileChange)
                 AppCard(
-                  child: ReportImagesGallery(
-                    imagePaths: current.imagePaths,
-                    imageStorage: imageStorage,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Текст отчёта', style: theme.textTheme.titleSmall),
-                    const SizedBox(height: 12),
-                    SelectableText(
-                      current.finalText ?? current.rawText ?? '—',
-                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.55),
-                    ),
-                  ],
-                ),
-              ),
-              if ((current.managerFeedback ?? '').isNotEmpty) ...[
-                const SizedBox(height: 12),
-                AppCard(
-                  borderColor: theme.colorScheme.error.withValues(alpha: 0.4),
-                  backgroundColor:
-                      theme.colorScheme.errorContainer.withValues(alpha: 0.25),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          ReportTypeChip(type: current.type),
+                          ReportStatusChip(status: current.status),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
                       Row(
                         children: [
-                          Icon(Icons.feedback_outlined,
-                              size: 18, color: theme.colorScheme.error),
+                          Icon(
+                            Icons.person_outline,
+                            size: 18,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                           const SizedBox(width: 8),
-                          Text(
-                            'Замечания',
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              color: theme.colorScheme.error,
+                          Expanded(
+                            child: Text(
+                              current.workerName,
+                              style: theme.textTheme.titleSmall,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Text(current.managerFeedback!),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.schedule_outlined,
+                            size: 16,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            current.sentAtLabel(df),
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              if (isProfileChange) ...[
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ReportTypeChip(type: current.type),
+                    ReportStatusChip(status: current.status),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ProfileChangeReportView(
+                  report: current,
+                  managerFeedback: canReview ? null : current.managerFeedback,
+                ),
+                if (current.hasImages) ...[
+                  const SizedBox(height: 12),
+                  AppCard(
+                    child: ReportImagesGallery(
+                      imagePaths: current.imagePaths,
+                      imageStorage: imageStorage,
+                    ),
+                  ),
+                ],
+              ] else ...[
+                if (current.hasImages) ...[
+                  const SizedBox(height: 12),
+                  AppCard(
+                    child: ReportImagesGallery(
+                      imagePaths: current.imagePaths,
+                      imageStorage: imageStorage,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Текст отчёта', style: theme.textTheme.titleSmall),
+                      const SizedBox(height: 12),
+                      SelectableText(
+                        current.finalText ?? current.rawText ?? '—',
+                        style: theme.textTheme.bodyMedium?.copyWith(height: 1.55),
+                      ),
                     ],
                   ),
                 ),
@@ -138,7 +150,9 @@ class ReportReviewScreen extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: () => _accept(context, current.id),
                   icon: const Icon(Icons.check_circle_outline),
-                  label: const Text('Принять отчёт'),
+                  label: Text(
+                    isProfileChange ? 'Одобрить изменения' : 'Принять отчёт',
+                  ),
                   style: FilledButton.styleFrom(
                     minimumSize: const Size.fromHeight(48),
                   ),
@@ -151,7 +165,11 @@ class ReportReviewScreen extends StatelessWidget {
                     foregroundColor: theme.colorScheme.error,
                     minimumSize: const Size.fromHeight(48),
                   ),
-                  label: const Text('Отклонить с замечаниями'),
+                  label: Text(
+                    isProfileChange
+                        ? 'Отклонить запрос'
+                        : 'Отклонить с замечаниями',
+                  ),
                 ),
               ],
               const SizedBox(height: 24),

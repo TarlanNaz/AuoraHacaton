@@ -40,6 +40,27 @@ void main() {
       expect(restored.hasStructured, isTrue);
     });
 
+    test('persists sentAt in JSON and submittedAt prefers it', () {
+      final created = DateTime.parse('2026-05-23T08:00:00Z');
+      final sent = DateTime.parse('2026-05-23T12:30:00Z');
+      final r = Report(
+        id: 'sent-1',
+        finalText: '## ok',
+        type: ReportType.incident,
+        status: ReportStatus.sent,
+        createdAt: created,
+        sentAt: sent,
+      );
+
+      final restored = Report.fromJson(r.toJson());
+      expect(restored.sentAt, sent);
+      expect(restored.submittedAt, sent);
+
+      final cleared = r.copyWith(clearSentAt: true);
+      expect(cleared.sentAt, isNull);
+      expect(cleared.submittedAt, created);
+    });
+
     test('copyWith(clearRawText: true) wipes rawText', () {
       final r = Report(
         id: 'x',

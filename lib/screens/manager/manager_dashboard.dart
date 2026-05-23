@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../config/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/app_ui.dart';
 import 'inbox_screen.dart';
@@ -29,7 +30,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: scheme.surface,
+      backgroundColor: AppTheme.scaffoldBackground,
       body: Column(
         children: [
           AuroraHeader(

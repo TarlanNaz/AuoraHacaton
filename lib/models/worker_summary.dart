@@ -27,14 +27,14 @@ class WorkerSummary {
 
     return byName.entries.map((e) {
       final list = e.value;
-      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      list.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
       return WorkerSummary(
         workerName: e.key,
         totalReports: list.length,
         pendingCount: list.where((r) => r.status == ReportStatus.sent).length,
         rejectedCount: list.where((r) => r.status == ReportStatus.rejected).length,
         acceptedCount: list.where((r) => r.status == ReportStatus.synced).length,
-        lastReportAt: list.isNotEmpty ? list.first.createdAt : null,
+        lastReportAt: list.isNotEmpty ? list.first.submittedAt : null,
       );
     }).toList()
       ..sort((a, b) {

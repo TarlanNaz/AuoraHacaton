@@ -45,12 +45,15 @@ class WorkerProfileProvider extends ChangeNotifier {
     var current = await _storage.loadWorkerProfile();
     current ??= WorkerProfile.initial(id: session.userId);
 
+    final isDemoWorker = session.login == AuthStubs.workerLogin;
     current = current.copyWith(
       id: session.userId,
       fullName: session.displayName,
+      employerName: isDemoWorker
+          ? AuthStubs.workerEmployer
+          : (current.employerName ?? WorkerProfile.defaultEmployer),
     );
 
-    final isDemoWorker = session.login == AuthStubs.workerLogin;
     if (isDemoWorker && current.photoPath == null) {
       try {
         final stored = await DemoAssetImporter(imageStorage: _images)

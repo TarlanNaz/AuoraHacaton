@@ -23,7 +23,7 @@ void main() {
       await tester.pumpAndSettle();
 
       const rawNotes = 'обработано 45 метрик, нет сети сейчас';
-      await tester.enterText(find.byType(TextField).first, rawNotes);
+      await tester.enterText(rawNotesTextField(), rawNotes);
       await tester.pump(ReportPrompts.draftAutosaveDebounce);
       await tester.pumpAndSettle();
 
@@ -32,7 +32,7 @@ void main() {
 
       expect(find.textContaining('Нет интернета'), findsWidgets);
 
-      await tester.enterText(find.byType(TextField).first, '$rawNotes дополнение');
+      await tester.enterText(rawNotesTextField(), '$rawNotes дополнение');
       await tester.pump(ReportPrompts.draftAutosaveDebounce);
       await tester.pumpAndSettle();
 

@@ -3,7 +3,14 @@ import 'package:flutter/material.dart';
 enum ReportType {
   incident('incident', 'Инцидент', Icons.warning_amber_rounded),
   metrics('metrics', 'Метрики', Icons.bar_chart_rounded),
-  clientVisit('client_visit', 'Визит к клиенту', Icons.handshake_outlined);
+  clientVisit('client_visit', 'Визит к клиенту', Icons.handshake_outlined),
+  profileChange(
+    'profile_change',
+    'Изменение данных',
+    Icons.badge_outlined,
+  );
+
+  bool get isProfileChange => this == ReportType.profileChange;
 
   const ReportType(this.id, this.label, this.icon);
   final String id;

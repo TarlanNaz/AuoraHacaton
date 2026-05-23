@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 import 'report_status.dart';
 import 'report_type.dart';
 import 'worker_profile.dart';
@@ -10,6 +12,8 @@ class Report {
   final ReportType type;
   final ReportStatus status;
   final DateTime createdAt;
+  /// Момент отправки руководителю (фиксируется при [ReportStatus.sent]).
+  final DateTime? sentAt;
   final List<String> imagePaths;
   final String workerName;
   final String? templateId;
@@ -23,6 +27,7 @@ class Report {
     required this.type,
     required this.status,
     required this.createdAt,
+    this.sentAt,
     this.imagePaths = const [],
     this.workerName = WorkerProfile.defaultName,
     this.templateId,
@@ -37,6 +42,20 @@ class Report {
   bool get hasStructured => (finalText ?? '').isNotEmpty;
   bool get hasRawData => (rawText ?? '').isNotEmpty;
   bool get hasImages => imagePaths.isNotEmpty;
+
+  /// Для списков и фильтров руководителя (дата отправки).
+  DateTime get submittedAt => sentAt ?? createdAt;
+
+  bool get hasSentTimestamp =>
+      sentAt != null || status != ReportStatus.draft;
+
+  /// Подпись даты для UI руководителя.
+  String sentAtLabel(DateFormat formatter) {
+    if (status == ReportStatus.draft) {
+      return 'Черновик · ${formatter.format(createdAt)}';
+    }
+    return 'Отправлен ${formatter.format(submittedAt)}';
+  }
 
   String get title {
     final source = displayBody.trim();
@@ -62,12 +81,14 @@ class Report {
     ReportType? type,
     ReportStatus? status,
     DateTime? createdAt,
+    DateTime? sentAt,
     List<String>? imagePaths,
     String? workerName,
     String? templateId,
     String? managerFeedback,
     bool clearRawText = false,
     bool clearManagerFeedback = false,
+    bool clearSentAt = false,
   }) {
     return Report(
       id: id ?? this.id,
@@ -76,6 +97,7 @@ class Report {
       type: type ?? this.type,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
+      sentAt: clearSentAt ? null : (sentAt ?? this.sentAt),
       imagePaths: imagePaths ?? this.imagePaths,
       workerName: workerName ?? this.workerName,
       templateId: templateId ?? this.templateId,
@@ -93,6 +115,7 @@ class Report {
         'type': type.id,
         'status': status.id,
         'createdAt': createdAt.toIso8601String(),
+        if (sentAt != null) 'sentAt': sentAt!.toIso8601String(),
         'imagePaths': imagePaths,
         'workerName': workerName,
         'templateId': templateId,
@@ -122,6 +145,9 @@ class Report {
       type: ReportType.fromId(json['type'] as String?),
       status: status,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      sentAt: json['sentAt'] != null
+          ? DateTime.parse(json['sentAt'] as String)
+          : null,
       imagePaths: images,
       workerName: json['workerName'] as String? ?? WorkerProfile.defaultName,
       templateId: json['templateId'] as String?,

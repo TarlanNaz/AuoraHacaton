@@ -18,6 +18,7 @@ import 'screens/manager/manager_dashboard.dart';
 import 'screens/worker/worker_dashboard.dart';
 import 'services/giga_chat_service.dart';
 import 'services/image_storage_service.dart';
+import 'services/location_service.dart';
 import 'services/mock_report_api_service.dart';
 import 'services/storage_service.dart';
 import 'utils/app_logger.dart';
@@ -52,6 +53,7 @@ class StructuratorApp extends StatelessWidget {
       providers: [
         Provider<StorageService>(create: (_) => SharedPrefsStorageService()),
         Provider<GigaChatService>(create: (_) => HttpGigaChatService()),
+        Provider<LocationService>(create: (_) => HttpLocationService()),
         Provider<ImageStorageService>(create: (_) => FileImageStorageService()),
         Provider<MockReportApiService>(
           create: (ctx) => HttpMockReportApiService(ctx.read<StorageService>()),
@@ -114,13 +116,13 @@ class _AppRoot extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    AppTheme.auroraDeep,
-                    AppTheme.auroraNavy,
+                    AppTheme.brandNavy,
+                    AppTheme.brandBlue,
                   ],
                 ),
               ),
               child: const Center(
-                child: CircularProgressIndicator(color: AppTheme.auroraMint),
+                child: CircularProgressIndicator(color: AppTheme.brandBlue),
               ),
             ),
           );

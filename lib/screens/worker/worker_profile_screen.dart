@@ -6,16 +6,15 @@ import 'package:provider/provider.dart';
 
 import '../../models/report.dart';
 import '../../models/report_status.dart';
-import '../../models/report_type.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/generation_provider.dart';
 import '../../providers/report_provider.dart';
 import '../../providers/worker_profile_provider.dart';
-import '../../utils/app_navigation.dart';
+import '../../config/app_theme.dart';
+import '../../utils/report_navigation.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/profile_avatar.dart';
 import '../../widgets/report_chips.dart';
-import 'create_report_screen.dart';
 
 class WorkerProfileScreen extends StatefulWidget {
   const WorkerProfileScreen({super.key});
@@ -47,27 +46,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   }
 
   void _requestProfileChange(BuildContext context) {
-    final profile = context.read<WorkerProfileProvider>().profile;
-    final login = context.read<AuthProvider>().userLogin ?? '—';
-    final template =
-        'Запрос на изменение персональных данных в профиле.\n\n'
-        'Текущие данные в системе:\n'
-        '— ФИО: ${profile.fullName}\n'
-        '— Логин: $login\n\n'
-        'Прошу изменить на:\n'
-        '— ФИО: \n'
-        '— Причина / комментарий: \n';
-
-    context.read<GenerationProvider>().reset();
-    Navigator.of(context).push(
-      AppNavigation.detailRoute(
-        CreateReportScreen(
-          initialText: template,
-          initialType: ReportType.clientVisit,
-          profileChangeRequest: true,
-        ),
-      ),
-    );
+    ReportNavigation.openProfileChangeForm(context);
   }
 
   @override
@@ -77,7 +56,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     final profileProv = context.watch<WorkerProfileProvider>();
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: AppTheme.scaffoldBackground,
       appBar: AppBar(
         title: const Text('Мой профиль'),
         flexibleSpace: Container(
@@ -89,7 +68,12 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
       body: Consumer<ReportProvider>(
         builder: (context, reports, _) {
           final stats = reports.workerStats;
-          final drafts = reports.drafts;
+          final drafts = reports.drafts
+              .where((r) => !r.type.isProfileChange)
+              .toList();
+          final profileDrafts = reports.drafts
+              .where((r) => r.type.isProfileChange)
+              .toList();
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -112,14 +96,18 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                         style: theme.textTheme.headlineSmall,
                         textAlign: TextAlign.center,
                       ),
+                      const SizedBox(height: 8),
+                      _ProfileMetaRow(
+                        icon: Icons.business_outlined,
+                        label: 'Место работы',
+                        value: profileProv.profile.displayEmployer,
+                      ),
                       if (context.watch<AuthProvider>().userLogin != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'Логин: ${context.read<AuthProvider>().userLogin}',
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                        const SizedBox(height: 6),
+                        _ProfileMetaRow(
+                          icon: Icons.badge_outlined,
+                          label: 'Логин',
+                          value: context.read<AuthProvider>().userLogin!,
                         ),
                       ],
                       const SizedBox(height: 12),
@@ -155,7 +143,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Откроется форма отчёта с запросом на исправление ФИО или фото',
+                        'Отдельная форма: ФИО, место работы, фото и причина',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -180,32 +168,56 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                     icon: Icons.send_outlined,
                     label: 'Отправлено',
                     value: '${stats.sent}',
-                    color: Colors.orange,
+                    color: AppTheme.warningAmber,
                   ),
                   _StatChip(
                     icon: Icons.edit_note_outlined,
                     label: 'Черновики',
                     value: '${stats.drafts}',
-                    color: Colors.grey,
+                    color: AppTheme.warningOrange,
                   ),
                   _StatChip(
                     icon: Icons.check_circle_outline,
                     label: 'Принято',
                     value: '${stats.accepted}',
-                    color: Colors.green,
+                    color: AppTheme.successGreen,
                   ),
                   _StatChip(
                     icon: Icons.cancel_outlined,
                     label: 'Отклонено',
                     value: '${stats.rejected}',
-                    color: Colors.red,
+                    color: AppTheme.errorMuted,
                   ),
                 ],
               ),
+              if (profileDrafts.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Text(
+                      'Запросы на изменение данных',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${profileDrafts.length}',
+                      style: theme.textTheme.labelLarge,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ...profileDrafts.map(
+                  (r) => _DraftTile(
+                    report: r,
+                    dateLabel: df.format(r.createdAt),
+                    onOpen: () => ReportNavigation.openWorkerReport(context, r),
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
               Row(
                 children: [
-                  Text('Черновики', style: theme.textTheme.titleMedium),
+                  Text('Черновики отчётов', style: theme.textTheme.titleMedium),
                   const Spacer(),
                   Text('${drafts.length}', style: theme.textTheme.labelLarge),
                 ],
@@ -240,15 +252,40 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
 
   void _openDraft(BuildContext context, Report r) {
     context.read<GenerationProvider>().reset();
-    Navigator.of(context).push(
-      AppNavigation.detailRoute(
-        CreateReportScreen(
-          initialText: r.rawText ?? r.finalText ?? '',
-          initialImagePaths: r.imagePaths,
-          initialType: r.type,
-          reportId: r.id,
+    ReportNavigation.openWorkerReport(context, r);
+  }
+}
+
+class _ProfileMetaRow extends StatelessWidget {
+  const _ProfileMetaRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 18, color: theme.colorScheme.primary),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            '$label: $value',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.45,
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 }

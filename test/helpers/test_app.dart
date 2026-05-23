@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:structurator/models/geo_place.dart';
 import 'package:structurator/models/report.dart';
 import 'package:structurator/models/user_role.dart';
 import 'package:structurator/config/auth_stubs.dart';
@@ -13,10 +14,21 @@ import 'package:structurator/providers/worker_profile_provider.dart';
 import 'package:structurator/screens/worker/worker_dashboard.dart';
 import 'package:structurator/services/giga_chat_service.dart';
 import 'package:structurator/services/image_storage_service.dart';
+import 'package:structurator/services/location_service.dart';
 import 'package:structurator/services/mock_report_api_service.dart';
 import 'package:structurator/services/storage_service.dart';
 
 import 'fakes.dart';
+
+/// Поле «Сырые заметки» (не путать с «Место / объект»).
+Finder rawNotesTextField() => find.byWidgetPredicate(
+      (w) => w is TextField && w.decoration?.labelText == 'Сырые заметки',
+    );
+
+class FakeLocationService implements LocationService {
+  @override
+  Future<GeoPlace?> searchPlace(String query) async => null;
+}
 
 class FakeMockReportApi implements MockReportApiService {
   @override
@@ -83,6 +95,7 @@ Future<HarnessHandles> pumpStructurator(
         Provider<StorageService>.value(value: fakeStorage),
         Provider<MockAuthService>.value(value: mockAuth),
         Provider<GigaChatService>.value(value: fakeGiga),
+        Provider<LocationService>(create: (_) => FakeLocationService()),
         Provider<ImageStorageService>(
           create: (_) => FileImageStorageService(),
         ),

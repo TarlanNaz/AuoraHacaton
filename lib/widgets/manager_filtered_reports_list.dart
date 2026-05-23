@@ -60,7 +60,7 @@ class _ManagerFilteredReportsListState extends State<ManagerFilteredReportsList>
                     final r = filtered[i];
                     return AppReportTile(
                       report: r,
-                      dateLabel: '${r.workerName} · ${df.format(r.createdAt)}',
+                      dateLabel: '${r.workerName} · ${r.sentAtLabel(df)}',
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
@@ -128,7 +128,7 @@ class _ManagerWorkerReportsListState extends State<ManagerWorkerReportsList> {
                     final r = filtered[i];
                     return AppReportTile(
                       report: r,
-                      dateLabel: df.format(r.createdAt),
+                      dateLabel: r.sentAtLabel(df),
                       feedback: r.managerFeedback,
                       leading: ProfileAvatar(
                         name: widget.workerName,

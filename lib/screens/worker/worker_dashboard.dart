@@ -12,6 +12,7 @@ import '../../providers/report_provider.dart';
 import '../../providers/worker_profile_provider.dart';
 import '../../config/app_theme.dart';
 import '../../utils/app_navigation.dart';
+import '../../utils/report_navigation.dart';
 import '../../utils/ui_feedback.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/profile_avatar.dart';
@@ -61,7 +62,7 @@ class _WorkerDashboardState extends State<WorkerDashboard>
     final profile = context.watch<WorkerProfileProvider>().profile;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: AppTheme.scaffoldBackground,
       body: Column(
         children: [
           AuroraHeader(
@@ -106,7 +107,7 @@ class _WorkerDashboardState extends State<WorkerDashboard>
                 tabBarTheme: TabBarThemeData(
                   labelColor: Colors.white,
                   unselectedLabelColor: Colors.white.withValues(alpha: 0.7),
-                  indicatorColor: AppTheme.auroraMint,
+                  indicatorColor: AppTheme.accentAmber,
                   dividerColor: Colors.transparent,
                 ),
               ),
@@ -186,6 +187,11 @@ class _WorkerDashboardState extends State<WorkerDashboard>
   }
 
   void _openReport(BuildContext context, Report r) {
+    if (r.type.isProfileChange) {
+      ReportNavigation.openWorkerReport(context, r);
+      return;
+    }
+
     final editable = r.status == ReportStatus.draft ||
         r.status == ReportStatus.rejected;
 
@@ -215,16 +221,7 @@ class _WorkerDashboardState extends State<WorkerDashboard>
     }
 
     context.read<GenerationProvider>().reset();
-    Navigator.of(context).push(
-      AppNavigation.detailRoute(
-        CreateReportScreen(
-          initialText: r.rawText ?? r.finalText ?? '',
-          initialImagePaths: r.imagePaths,
-          initialType: r.type,
-          reportId: r.id,
-        ),
-      ),
-    );
+    ReportNavigation.openWorkerReport(context, r);
   }
 
   Future<void> _tokenDialog(BuildContext context) async {
@@ -266,7 +263,7 @@ class _ReportList extends StatelessWidget {
         final feedback = r.managerFeedback;
         return AppReportTile(
           report: r,
-          dateLabel: df.format(r.createdAt),
+          dateLabel: r.sentAtLabel(df),
           onTap: () => onOpen(r),
           feedback: feedback != null && feedback.isNotEmpty
               ? 'Замечания: $feedback'

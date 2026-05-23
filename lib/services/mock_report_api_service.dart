@@ -38,7 +38,10 @@ class HttpMockReportApiService implements MockReportApiService {
     }
 
     final inbox = await _storage.loadManagerInbox();
-    final sent = report.copyWith(status: ReportStatus.sent);
+    final sent = report.copyWith(
+      status: ReportStatus.sent,
+      sentAt: report.sentAt ?? DateTime.now(),
+    );
     inbox.insert(0, sent);
     await _storage.saveManagerInbox(inbox);
 
@@ -106,6 +109,7 @@ class MockInboxSeeder {
         type: ReportType.incident,
         status: ReportStatus.sent,
         createdAt: now.subtract(const Duration(hours: 5)),
+        sentAt: now.subtract(const Duration(hours: 5)),
         workerName: AuthStubs.workerDisplayName,
         imagePaths: [incidentPhoto],
       ),
@@ -124,6 +128,7 @@ class MockInboxSeeder {
         type: ReportType.metrics,
         status: ReportStatus.synced,
         createdAt: now.subtract(const Duration(days: 1, hours: 2)),
+        sentAt: now.subtract(const Duration(days: 1, hours: 2)),
         workerName: 'Петрова М.К.',
         imagePaths: [metricsPhoto],
       ),
@@ -145,6 +150,7 @@ class MockInboxSeeder {
         type: ReportType.clientVisit,
         status: ReportStatus.sent,
         createdAt: now.subtract(const Duration(days: 2)),
+        sentAt: now.subtract(const Duration(days: 2)),
         workerName: 'Сидоров К.Н.',
         imagePaths: [visitPhoto],
       ),
@@ -153,7 +159,7 @@ class MockInboxSeeder {
     var inbox = await _storage.loadManagerInbox();
     inbox.removeWhere((r) => r.id.startsWith('mock-'));
     inbox.insertAll(0, mocks);
-    inbox.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    inbox.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
     await _storage.saveManagerInbox(inbox);
     await _storage.setMockInboxSeeded();
     AppLogger.info(_tag, 'seeded ${mocks.length} demo reports with photos');

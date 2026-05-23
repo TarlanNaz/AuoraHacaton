@@ -34,7 +34,7 @@ class AuthScreen extends StatelessWidget {
                         gradient: AuroraGradient.accent,
                         boxShadow: [
                           BoxShadow(
-                            color: AppTheme.auroraMint.withValues(alpha: 0.35),
+                            color: AppTheme.accentAmber.withValues(alpha: 0.4),
                             blurRadius: 24,
                             offset: const Offset(0, 8),
                           ),
@@ -187,7 +187,7 @@ class _LoginFormState extends State<_LoginForm> {
         FilledButton(
           onPressed: _busy ? null : _submit,
           style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(50),
+            minimumSize: const Size.fromHeight(AppTheme.minTouchTarget),
           ),
           child: _busy
               ? SizedBox(

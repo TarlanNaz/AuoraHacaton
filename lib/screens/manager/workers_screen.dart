@@ -79,7 +79,7 @@ class _WorkerCard extends StatelessWidget {
                 ),
                 if (summary.lastReportAt != null)
                   Text(
-                    'Последний: ${df.format(summary.lastReportAt!)}',
+                    'Последняя отправка: ${df.format(summary.lastReportAt!)}',
                     style: Theme.of(context).textTheme.labelMedium,
                   ),
               ],

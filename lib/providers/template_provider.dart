@@ -37,6 +37,7 @@ class TemplateProvider extends ChangeNotifier {
   Future<void> ensureOnePerReportType() async {
     var changed = false;
     for (final type in ReportType.values) {
+      if (type.isProfileChange) continue;
       if (_templates.any((t) => t.reportType == type)) continue;
       _templates.add(_defaultTemplateFor(type));
       changed = true;
@@ -47,8 +48,10 @@ class TemplateProvider extends ChangeNotifier {
     }
   }
 
-  List<ReportTemplate> _defaultTemplates() =>
-      ReportType.values.map(_defaultTemplateFor).toList();
+  List<ReportTemplate> _defaultTemplates() => ReportType.values
+      .where((t) => !t.isProfileChange)
+      .map(_defaultTemplateFor)
+      .toList();
 
   ReportTemplate _defaultTemplateFor(ReportType type) {
     return switch (type) {
@@ -79,6 +82,9 @@ class TemplateProvider extends ChangeNotifier {
               'Указать компанию, контакт, договорённости, следующий шаг. '
               'Бюджет и сроки — только если есть в тексте или на фото.',
           isDefault: true,
+        ),
+      ReportType.profileChange => throw ArgumentError(
+          'profileChange не использует шаблоны руководителя',
         ),
     };
   }
