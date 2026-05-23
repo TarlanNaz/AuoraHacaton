@@ -19,7 +19,7 @@ void main() {
         manualToken: 'tok-x',
       );
 
-      await tester.tap(find.text('Новый отчёт'));
+      await tapNewReport(tester);
       await tester.pumpAndSettle();
 
       const rawNotes = 'обработано 45 метрик, нет сети сейчас';
@@ -40,6 +40,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Мои отчёты'), findsOneWidget);
+      await tester.tap(find.textContaining('Черновики'));
+      await tester.pumpAndSettle();
       expect(find.text('Черновик'), findsOneWidget);
 
       expect(harness.storage.persisted, hasLength(1));

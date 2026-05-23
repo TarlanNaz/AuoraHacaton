@@ -71,6 +71,157 @@ class AppCard extends StatelessWidget {
   }
 }
 
+/// Сегментированные вкладки в шапке (белый «пилюльный» индикатор).
+class AuroraSegmentedTabs extends StatelessWidget {
+  const AuroraSegmentedTabs({
+    super.key,
+    required this.controller,
+    required this.tabs,
+  });
+
+  final TabController controller;
+  final List<Widget> tabs;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TabBar(
+        controller: controller,
+        dividerHeight: 0,
+        indicatorSize: TabBarIndicatorSize.tab,
+        indicator: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(9),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        labelColor: AppTheme.brandNavy,
+        unselectedLabelColor: Colors.white.withValues(alpha: 0.88),
+        labelStyle: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          height: 1.2,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          height: 1.2,
+        ),
+        tabs: tabs,
+      ),
+    );
+  }
+}
+
+/// Секция формы внутри карточки.
+class AppFormSection extends StatelessWidget {
+  const AppFormSection({
+    super.key,
+    required this.title,
+    required this.icon,
+    required this.child,
+    this.subtitle,
+  });
+
+  final String title;
+  final String? subtitle;
+  final IconData icon;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return AppCard(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppTheme.brandBlueLight,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 22, color: scheme.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: Theme.of(context).textTheme.titleMedium),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+/// Нижняя панель действий (кнопки «Сгенерировать», «Отправить»).
+class AppBottomActionBar extends StatelessWidget {
+  const AppBottomActionBar({super.key, required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceWhite,
+        border: const Border(top: BorderSide(color: AppTheme.cardBorder)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: children,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Пустое состояние списка.
 class AppEmptyState extends StatelessWidget {
   const AppEmptyState({
@@ -96,11 +247,12 @@ class AppEmptyState extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 88,
-              height: 88,
+              width: 96,
+              height: 96,
               decoration: BoxDecoration(
-                color: AppTheme.demoPanelBackground,
+                color: AppTheme.brandBlueLight,
                 shape: BoxShape.circle,
+                border: Border.all(color: scheme.primary.withValues(alpha: 0.15)),
               ),
               child: Icon(icon, size: 44, color: scheme.primary),
             ),
@@ -197,7 +349,8 @@ class _TitleBlock extends StatelessWidget {
           title,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 color: Colors.white,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.2,
               ),
         ),
         if (subtitle != null) ...[
@@ -237,14 +390,15 @@ class AppReportTile extends StatelessWidget {
 
     return AppCard(
       onTap: onTap,
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.all(16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (leading != null) ...[
             leading!,
             const SizedBox(width: 12),
-          ]           else
+          ] else
             Stack(
               clipBehavior: Clip.none,
               children: [

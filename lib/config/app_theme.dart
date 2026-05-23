@@ -9,16 +9,16 @@ class AppTheme {
   /// Минимальный размер зоны нажатия для полевой работы (перчатки, холод).
   static const double minTouchTarget = 48;
 
-  // ─── Фон и поверхности (светлая «белая» демо-тема для Aurora) ────────────
-  static const Color scaffoldBackground = Color(0xFFFFFFFF);
+  // ─── Фон и поверхности (off-white + белые карточки, B2G) ─────────────────
+  static const Color scaffoldBackground = Color(0xFFF5F7FA);
   static const Color surfaceWhite = Color(0xFFFFFFFF);
-  static const Color surfaceGrayMuted = Color(0xFFF5F5F5);
-  static const Color demoPanelBackground = Color(0xFFFAFAFA);
-  static const Color cardBorder = Color(0xFFEEEEEE);
+  static const Color surfaceGrayMuted = Color(0xFFECEFF1);
+  static const Color demoPanelBackground = Color(0xFFEEF2F6);
+  static const Color cardBorder = Color(0xFFE0E4EA);
 
-  // ─── Текст (высокий контраст для Aurora / Qt) ────────────────────────────
-  static const Color textPrimary = Color(0xFF000000);
-  static const Color textSecondary = Color(0xFF212121);
+  // ─── Текст (контраст для Aurora / Qt, без «серого Windows») ──────────────
+  static const Color textPrimary = Color(0xFF263238);
+  static const Color textSecondary = Color(0xFF546E7A);
 
   // ─── Бренд: navy + deep blue ─────────────────────────────────────────────
   static const Color brandNavy = Color(0xFF1A2B4A);
@@ -57,7 +57,7 @@ class AppTheme {
       brightness: Brightness.light,
       primary: brandBlue,
       onPrimary: surfaceWhite,
-      primaryContainer: surfaceWhite,
+      primaryContainer: brandBlueLight,
       onPrimaryContainer: Color(0xFF0D47A1),
       secondary: brandDarkGray,
       onSecondary: surfaceWhite,
@@ -239,6 +239,7 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surfaceWhite,
+        floatingLabelBehavior: FloatingLabelBehavior.auto,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radiusMd),
           borderSide: BorderSide(color: scheme.outlineVariant),

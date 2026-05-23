@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:structurator/models/geo_place.dart';
 import 'package:structurator/models/report.dart';
 import 'package:structurator/models/user_role.dart';
 import 'package:structurator/config/auth_stubs.dart';
@@ -14,7 +13,6 @@ import 'package:structurator/providers/worker_profile_provider.dart';
 import 'package:structurator/screens/worker/worker_dashboard.dart';
 import 'package:structurator/services/giga_chat_service.dart';
 import 'package:structurator/services/image_storage_service.dart';
-import 'package:structurator/services/location_service.dart';
 import 'package:structurator/services/mock_report_api_service.dart';
 import 'package:structurator/services/storage_service.dart';
 
@@ -25,35 +23,18 @@ Finder rawNotesTextField() => find.byWidgetPredicate(
       (w) => w is TextField && w.decoration?.labelText == 'Сырые заметки',
     );
 
-/// Кнопка «Сгенерировать» уходит ниже fold после блока геолокации — прокручиваем.
-Future<void> tapGenerateButton(WidgetTester tester) async {
-  final btn = find.text('Сгенерировать');
-  await tester.scrollUntilVisible(
-    btn,
-    120,
-    scrollable: find.byType(Scrollable).first,
-  );
-  await tester.ensureVisible(btn);
-  await tester.tap(btn);
+/// Открыть экран создания отчёта с дашборда рабочего.
+Future<void> tapNewReport(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('worker_new_report')));
   await tester.pumpAndSettle();
 }
 
-class FakeLocationService implements LocationService {
-  static const _demoPlace = GeoPlace(
-    displayName: 'Тестовое место',
-    latitude: 68.97,
-    longitude: 33.09,
-  );
-
-  @override
-  Future<GeoPlace?> searchPlace(String query) async => _demoPlace;
-
-  @override
-  Future<GeoPlace> getCurrentPosition() async => _demoPlace;
-
-  @override
-  Future<GeoPlace?> reverseGeocode(double latitude, double longitude) async =>
-      _demoPlace;
+/// Кнопка «Сгенерировать» в нижней панели экрана создания отчёта.
+Future<void> tapGenerateButton(WidgetTester tester) async {
+  final btn = find.text('Сгенерировать отчёт');
+  await tester.ensureVisible(btn);
+  await tester.tap(btn);
+  await tester.pumpAndSettle();
 }
 
 class FakeMockReportApi implements MockReportApiService {
@@ -121,7 +102,6 @@ Future<HarnessHandles> pumpStructurator(
         Provider<StorageService>.value(value: fakeStorage),
         Provider<MockAuthService>.value(value: mockAuth),
         Provider<GigaChatService>.value(value: fakeGiga),
-        Provider<LocationService>(create: (_) => FakeLocationService()),
         Provider<ImageStorageService>(
           create: (_) => FileImageStorageService(),
         ),

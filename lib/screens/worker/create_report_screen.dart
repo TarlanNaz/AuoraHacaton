@@ -7,14 +7,12 @@ import 'package:provider/provider.dart';
 import '../../config/app_theme.dart';
 import '../../config/report_prompts.dart';
 import '../../config/sample_inputs.dart';
-import '../../models/geo_place.dart';
 import '../../models/report_type.dart';
 import '../../providers/generation_provider.dart';
 import '../../providers/report_provider.dart';
 import '../../providers/template_provider.dart';
 import '../../providers/worker_profile_provider.dart';
 import '../../services/image_storage_service.dart';
-import '../../services/location_service.dart';
 import '../../utils/draft_autosave.dart';
 import '../../utils/ui_feedback.dart';
 import '../../widgets/app_ui.dart';
@@ -46,10 +44,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   late List<String> _imageNames;
   String? _savedReportId;
   bool _sending = false;
-  bool _geocoding = false;
-  bool _locatingGps = false;
-  GeoPlace? _resolvedPlace;
-
   late final DraftAutosave _autosave;
   AutosaveUiState _autosaveUi = AutosaveUiState.idle;
   DateTime? _lastSavedAt;
@@ -109,15 +103,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     if (locationText.isNotEmpty) {
       _locationController.text = locationText;
     }
-    if (report.hasLocationCoords) {
-      setState(() {
-        _resolvedPlace = GeoPlace(
-          displayName: report.locationName ?? locationText,
-          latitude: report.locationLat!,
-          longitude: report.locationLon!,
-        );
-      });
-    }
   }
 
   @override
@@ -159,7 +144,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       final finalText = hasStructured ? _resultController.text : null;
 
       final locQuery = _locationController.text.trim();
-      final place = _resolvedPlace;
 
       final saved = await rp.upsertDraft(
         existingId: _savedReportId,
@@ -170,9 +154,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         imagePaths: _imageNames,
         templateId: tpl?.id,
         locationQuery: locQuery.isEmpty ? null : locQuery,
-        locationName: place?.displayName,
-        locationLat: place?.latitude,
-        locationLon: place?.longitude,
+        locationName: locQuery.isEmpty ? null : locQuery,
       );
 
       if (!mounted) return;
@@ -198,40 +180,11 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     return files;
   }
 
-  bool _hasLocationDraft() =>
-      _locationController.text.trim().isNotEmpty || _resolvedPlace != null;
+  bool _hasLocationDraft() => _locationController.text.trim().isNotEmpty;
 
   String? _locationPromptContext() {
-    final place = _resolvedPlace;
-    if (place != null) {
-      return '${place.displayName} (координаты: ${place.coordinatesLabel})';
-    }
     final q = _locationController.text.trim();
     return q.isEmpty ? null : q;
-  }
-
-  Future<void> _acquireGps() async {
-    setState(() => _locatingGps = true);
-    try {
-      final place =
-          await context.read<LocationService>().getCurrentPosition();
-      if (!mounted) return;
-      setState(() {
-        _resolvedPlace = place;
-        _locationController.text = place.displayName;
-        _locatingGps = false;
-      });
-      _autosave.schedule();
-      UiFeedback.info(context, 'Геопозиция сохранена в черновик');
-    } on LocationException catch (e) {
-      if (!mounted) return;
-      setState(() => _locatingGps = false);
-      UiFeedback.warning(context, e.message);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _locatingGps = false);
-      UiFeedback.warning(context, 'Геопозиция: $e');
-    }
   }
 
   String _systemPrompt() {
@@ -244,39 +197,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       workerName: name,
       locationContext: _locationPromptContext(),
     );
-  }
-
-  Future<void> _resolveLocation() async {
-    final query = _locationController.text.trim();
-    if (query.length < 3) {
-      UiFeedback.warning(context, 'Введите место не короче 3 символов');
-      return;
-    }
-
-    setState(() => _geocoding = true);
-    try {
-      final place =
-          await context.read<LocationService>().searchPlace(query);
-      if (!mounted) return;
-      if (place == null) {
-        setState(() {
-          _resolvedPlace = null;
-          _geocoding = false;
-        });
-        UiFeedback.warning(context, 'Место не найдено. Уточните запрос.');
-        return;
-      }
-      setState(() {
-        _resolvedPlace = place;
-        _geocoding = false;
-      });
-      _autosave.schedule();
-      UiFeedback.info(context, 'Место уточнено и сохранено');
-    } on LocationException catch (e) {
-      if (!mounted) return;
-      setState(() => _geocoding = false);
-      UiFeedback.warning(context, e.message);
-    }
   }
 
   Future<void> _generate() async {
@@ -416,187 +336,158 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 12),
-              child: Center(child: _AutosaveIndicator(state: _autosaveUi, savedAt: _lastSavedAt)),
+              child: Center(
+                child: _AutosaveIndicator(
+                  state: _autosaveUi,
+                  savedAt: _lastSavedAt,
+                  onDarkBackground: true,
+                ),
+              ),
             ),
           ],
         ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-              DropdownButtonFormField<ReportType>(
-                  value: _type,
-                  decoration: const InputDecoration(
-                    labelText: 'Тип отчёта',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: ReportType.values
-                      .where((t) => !t.isProfileChange)
-                      .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
-                      .toList(),
-                  onChanged: _onTypeChanged,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _locationController,
-                  decoration: InputDecoration(
-                    labelText: 'Место / объект',
-                    hintText: 'Адрес или объект; координаты сохраняются в черновик',
-                    prefixIcon: const Icon(Icons.place_outlined),
-                  ),
-                  onSubmitted: (_) => _resolveLocation(),
-                ),
-                const SizedBox(height: 8),
-                Row(
+        body: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: (_geocoding || _locatingGps)
-                            ? null
-                            : _acquireGps,
-                        icon: _locatingGps
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.my_location),
-                        label: const Text('Моё местоположение'),
+                    AppFormSection(
+                      title: 'Тип и объект',
+                      subtitle: 'Укажите место текстом — сохранится в черновик',
+                      icon: Icons.place_outlined,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          DropdownButtonFormField<ReportType>(
+                            value: _type,
+                            decoration: const InputDecoration(
+                              labelText: 'Тип отчёта',
+                            ),
+                            items: ReportType.values
+                                .where((t) => !t.isProfileChange)
+                                .map(
+                                  (t) => DropdownMenuItem(
+                                    value: t,
+                                    child: Text(t.label),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: _onTypeChanged,
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _locationController,
+                            decoration: const InputDecoration(
+                              labelText: 'Место / объект',
+                              hintText: 'Например: цех Б, узел №4',
+                              prefixIcon: Icon(Icons.location_on_outlined),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: (_geocoding || _locatingGps)
-                            ? null
-                            : _resolveLocation,
-                        icon: _geocoding
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.map_outlined),
-                        label: const Text('Уточнить адрес'),
+                    AppFormSection(
+                      title: 'Материалы',
+                      subtitle: 'Фото и готовые примеры для типа отчёта',
+                      icon: Icons.photo_library_outlined,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          AttachedImagesPanel(
+                            imageNames: _imageNames,
+                            imageStorage:
+                                context.read<ImageStorageService>(),
+                            onChanged: _onImagesChanged,
+                          ),
+                          const SizedBox(height: 12),
+                          _SamplesStrip(type: _type, onPick: _applySample),
+                        ],
+                      ),
+                    ),
+                    AppFormSection(
+                      title: 'Сырые заметки',
+                      subtitle: 'Кратко, как в блокноте — ИИ оформит по шаблону',
+                      icon: Icons.edit_note_outlined,
+                      child: TextField(
+                        controller: _rawController,
+                        maxLines: 5,
+                        minLines: 4,
+                        decoration: const InputDecoration(
+                          labelText: 'Сырые заметки',
+                          hintText: 'Факты, цифры, что видели на объекте',
+                        ),
+                      ),
+                    ),
+                    AppFormSection(
+                      title: 'Структурированный отчёт',
+                      subtitle: 'Появится после генерации, можно править',
+                      icon: Icons.auto_awesome_outlined,
+                      child: SizedBox(
+                        height: 240,
+                        child: _ResultArea(controller: _resultController),
                       ),
                     ),
                   ],
                 ),
-                if (_resolvedPlace != null) ...[
-                  const SizedBox(height: 8),
-                  AppCard(
-                    padding: const EdgeInsets.all(12),
-                    backgroundColor: AppTheme.brandBlueLight,
-                    borderColor: AppTheme.cardBorder,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.check_circle_outline,
-                          size: 18,
-                          color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            Consumer<GenerationProvider>(
+              builder: (context, gen, _) {
+                return AppBottomActionBar(
+                  children: [
+                    FilledButton.icon(
+                      onPressed: gen.isLoading ? null : _generate,
+                      icon: gen.isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.auto_awesome),
+                      label: Text(
+                        gen.isLoading ? 'Анализ…' : 'Сгенерировать отчёт',
+                      ),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(
+                          AppTheme.minTouchTarget,
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _resolvedPlace!.displayName,
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Координаты: ${_resolvedPlace!.coordinatesLabel}',
-                                style: Theme.of(context).textTheme.labelMedium,
-                              ),
-                            ],
+                      ),
+                    ),
+                    if (gen.status == GenerationStatus.success) ...[
+                      const SizedBox(height: 10),
+                      FilledButton.icon(
+                        onPressed: _sending ? null : _sendToManager,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppTheme.successGreen,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(
+                            AppTheme.minTouchTarget,
                           ),
                         ),
-                        IconButton(
-                          tooltip: 'Сбросить координаты',
-                          icon: const Icon(Icons.close, size: 18),
-                          onPressed: () {
-                            setState(() => _resolvedPlace = null);
-                            _autosave.schedule();
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-              _SamplesStrip(type: _type, onPick: _applySample),
-              const SizedBox(height: 12),
-                AttachedImagesPanel(
-                  imageNames: _imageNames,
-                  imageStorage: context.read<ImageStorageService>(),
-                  onChanged: _onImagesChanged,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _rawController,
-                  maxLines: 4,
-                  minLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Сырые заметки',
-                    hintText: 'Кратко, как в блокноте. Сохраняется автоматически.',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Consumer<GenerationProvider>(
-                  builder: (context, gen, _) => FilledButton.icon(
-                    onPressed: gen.isLoading ? null : _generate,
-                    icon: gen.isLoading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.auto_awesome),
-                    label: Text(gen.isLoading ? 'Анализ…' : 'Сгенерировать'),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 220,
-                  child: _ResultArea(controller: _resultController),
-                ),
+                        icon: _sending
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.send_rounded),
+                        label: const Text('Отправить руководителю'),
+                      ),
                     ],
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: Consumer<GenerationProvider>(
-                  builder: (context, gen, _) {
-                    if (gen.status != GenerationStatus.success) {
-                      return const SizedBox.shrink();
-                    }
-                    return FilledButton.icon(
-                      onPressed: _sending ? null : _sendToManager,
-                      icon: _sending
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.send_rounded),
-                      label: const Text('Отправить руководителю'),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
+                  ],
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -606,39 +497,40 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
 enum AutosaveUiState { idle, pending, saving, saved, error }
 
 class _AutosaveIndicator extends StatelessWidget {
-  const _AutosaveIndicator({required this.state, this.savedAt});
+  const _AutosaveIndicator({
+    required this.state,
+    this.savedAt,
+    this.onDarkBackground = false,
+  });
 
   final AutosaveUiState state;
   final DateTime? savedAt;
+  final bool onDarkBackground;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final muted = onDarkBackground
+        ? Colors.white.withValues(alpha: 0.75)
+        : theme.colorScheme.onSurfaceVariant;
+    final accent = onDarkBackground ? Colors.white : theme.colorScheme.primary;
     final (icon, label, color) = switch (state) {
-      AutosaveUiState.idle => (
-          Icons.cloud_outlined,
-          'Черновик',
-          theme.colorScheme.onSurfaceVariant,
-        ),
-      AutosaveUiState.pending => (
-          Icons.cloud_sync_outlined,
-          '…',
-          theme.colorScheme.onSurfaceVariant,
-        ),
+      AutosaveUiState.idle => (Icons.cloud_outlined, 'Черновик', muted),
+      AutosaveUiState.pending => (Icons.cloud_sync_outlined, '…', muted),
       AutosaveUiState.saving => (
           Icons.cloud_upload_outlined,
           'Сохранение',
-          theme.colorScheme.primary,
+          accent,
         ),
       AutosaveUiState.saved => (
           Icons.cloud_done_outlined,
           savedAt != null ? DateFormat('HH:mm').format(savedAt!) : 'Сохранено',
-          theme.colorScheme.primary,
+          accent,
         ),
       AutosaveUiState.error => (
           Icons.cloud_off_outlined,
           'Ошибка',
-          theme.colorScheme.error,
+          onDarkBackground ? const Color(0xFFFFCDD2) : theme.colorScheme.error,
         ),
     };
 
@@ -691,51 +583,66 @@ class _ResultArea extends StatelessWidget {
       builder: (context, gen, _) {
         switch (gen.status) {
           case GenerationStatus.empty:
-            return Card(
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppTheme.demoPanelBackground,
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                border: Border.all(color: AppTheme.cardBorder),
+              ),
               child: Center(
-                child: Text(
-                  'Результат появится здесь',
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'Нажмите «Сгенерировать отчёт» внизу экрана',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
                 ),
               ),
             );
           case GenerationStatus.loading:
-            return const Card(
-              child: Center(child: CircularProgressIndicator()),
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceWhite,
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                border: Border.all(color: AppTheme.cardBorder),
+              ),
+              child: const Center(child: CircularProgressIndicator()),
             );
           case GenerationStatus.error:
-            return Card(
-              color: Theme.of(context).colorScheme.errorContainer,
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3),
+                ),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(gen.error ?? 'Ошибка'),
               ),
             );
           case GenerationStatus.success:
-            return Card(
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceWhite,
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                border: Border.all(color: AppTheme.cardBorder),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Редактируйте отчёт — изменения сохраняются автоматически',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        maxLines: null,
-                        expands: true,
-                        textAlignVertical: TextAlignVertical.top,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          hintText: 'Структурированный текст…',
-                        ),
-                      ),
-                    ),
-                  ],
+                child: TextField(
+                  controller: controller,
+                  maxLines: null,
+                  expands: true,
+                  textAlignVertical: TextAlignVertical.top,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    hintText: 'Структурированный текст…',
+                  ),
                 ),
               ),
             );

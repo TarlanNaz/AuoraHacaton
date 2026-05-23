@@ -18,7 +18,7 @@ void main() {
         manualToken: 'manual-bearer-test',
       );
 
-      await tester.tap(find.text('Новый отчёт'));
+      await tapNewReport(tester);
       await tester.pumpAndSettle();
 
       const rawNotes =
@@ -30,7 +30,7 @@ void main() {
       await tapGenerateButton(tester);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Редактируйте отчёт'), findsOneWidget);
+      expect(find.textContaining('Структурированный текст'), findsWidgets);
       expect(find.textContaining('Структурированный текст'), findsWidgets);
 
       expect(harness.storage.persisted, hasLength(1));

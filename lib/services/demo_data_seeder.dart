@@ -45,6 +45,8 @@ class DemoDataSeeder {
         createdAt: now.subtract(const Duration(hours: 3)),
         sentAt: now.subtract(const Duration(hours: 3)),
         workerName: AuthStubs.workerDisplayName,
+        locationQuery: 'Цех Б, узел №4',
+        locationName: 'Мурманск, промплощадка, цех Б',
         imagePaths: [photo],
       ),
       Report(
@@ -64,6 +66,7 @@ class DemoDataSeeder {
         createdAt: now.subtract(const Duration(days: 1)),
         sentAt: now.subtract(const Duration(days: 1)),
         workerName: 'Петрова М.К.',
+        locationQuery: 'Участок «Юг», линия 3',
         imagePaths: [photo],
       ),
       Report(
@@ -86,6 +89,7 @@ class DemoDataSeeder {
         createdAt: now.subtract(const Duration(days: 2, hours: 4)),
         sentAt: now.subtract(const Duration(days: 2, hours: 4)),
         workerName: 'Сидоров К.Н.',
+        locationQuery: 'Склад №2, ООО «СеверТех»',
         imagePaths: [photo],
       ),
       Report(
@@ -122,7 +126,11 @@ class DemoDataSeeder {
   }
 
   Future<void> seedWorkerReportsIfNeeded() async {
-    if (await _storage.isDemoWorkerSeeded()) return;
+    final existingCheck = await _storage.loadReports();
+    if (existingCheck.any((r) => r.id == 'demo-worker-draft-2')) {
+      await _storage.setDemoWorkerSeeded();
+      return;
+    }
 
     final photo = await DemoAssetImporter(imageStorage: _images)
         .importAsset(_photoAsset);
@@ -130,6 +138,32 @@ class DemoDataSeeder {
     final name = AuthStubs.workerDisplayName;
 
     final reports = [
+      // ─── Черновики ───────────────────────────────────────────────────────
+      Report(
+        id: 'demo-worker-draft-1',
+        rawText:
+            'Насос №4 — шум при запуске. Нужно сфотографировать шильдик и замерить вибрацию.',
+        type: ReportType.incident,
+        status: ReportStatus.draft,
+        createdAt: now.subtract(const Duration(hours: 2)),
+        workerName: name,
+        locationQuery: 'Цех Б, насос №4',
+        locationName: 'Цех Б, насос №4',
+        imagePaths: [photo],
+      ),
+      Report(
+        id: 'demo-worker-draft-2',
+        rawText:
+            'Смена 14.05: линия 2 в норме, по линии 3 отклонение давления +0.3 бар. '
+            'Табло снято на фото.',
+        type: ReportType.metrics,
+        status: ReportStatus.draft,
+        createdAt: now.subtract(const Duration(hours: 5)),
+        workerName: name,
+        locationQuery: 'Участок «Юг»',
+        imagePaths: const [],
+      ),
+      // ─── Отправленные / проверенные ──────────────────────────────────────
       Report(
         id: 'demo-worker-sent',
         finalText: '## Осмотр трансформаторной, п. Северный\n\n'
@@ -141,19 +175,61 @@ class DemoDataSeeder {
             '## Выводы\n'
             '- Продолжить мониторинг по графику',
         type: ReportType.metrics,
+        status: ReportStatus.sent,
+        createdAt: now.subtract(const Duration(days: 1, hours: 6)),
+        sentAt: now.subtract(const Duration(days: 1, hours: 6)),
+        workerName: name,
+        locationQuery: 'п. Северный, трансформаторная',
+        imagePaths: [photo],
+      ),
+      Report(
+        id: 'demo-worker-synced',
+        finalText: '## Плановый обход кабельного канала\n\n'
+            '## Сводка\n'
+            '- Маркировка кабелей соответствует схеме\n'
+            '- Посторонних предметов нет\n\n'
+            '## Выводы\n'
+            '- Следующий обход по графику',
+        type: ReportType.incident,
         status: ReportStatus.synced,
         createdAt: now.subtract(const Duration(days: 3)),
         sentAt: now.subtract(const Duration(days: 3)),
         workerName: name,
+        locationQuery: 'Кабельный канал, сектор 7',
         imagePaths: [photo],
       ),
       Report(
-        id: 'demo-worker-draft',
-        rawText: 'Насос №4 — шум при запуске. Нужно сфотографировать шильдик.',
-        type: ReportType.incident,
-        status: ReportStatus.draft,
-        createdAt: now.subtract(const Duration(hours: 2)),
+        id: 'demo-worker-rejected',
+        finalText: '## Визит на объект «СеверМет»\n\n'
+            '## Сводка\n'
+            '- Встреча с техдиректором\n'
+            '- Обсудили сроки поставки\n\n'
+            '## Замечания\n'
+            '- Не указаны конкретные даты в договорённостях',
+        type: ReportType.clientVisit,
+        status: ReportStatus.rejected,
+        createdAt: now.subtract(const Duration(days: 4)),
+        sentAt: now.subtract(const Duration(days: 4)),
         workerName: name,
+        locationQuery: 'ООО «СеверМет», офис',
+        managerFeedback:
+            'Дополните раздел «Договорённости» конкретными датами и ответственными.',
+        imagePaths: const [],
+      ),
+      Report(
+        id: 'demo-worker-sent-2',
+        finalText: '## Контроль давления на линии 1\n\n'
+            '## Сводка\n'
+            '- Давление 4.2 бар, в пределах нормы\n'
+            '- Утечек не обнаружено\n\n'
+            '## Фотофиксация\n'
+            '- фото 1 — манометр',
+        type: ReportType.metrics,
+        status: ReportStatus.sent,
+        createdAt: now.subtract(const Duration(hours: 20)),
+        sentAt: now.subtract(const Duration(hours: 20)),
+        workerName: name,
+        locationQuery: 'Линия 1, пост №2',
         imagePaths: [photo],
       ),
     ];

@@ -16,21 +16,6 @@ class ApiConfig {
   static const String filesUploadUrl =
       'https://gigachat.devices.sberbank.ru/api/v1/files';
 
-  // ─── API 2: геокодирование (OpenStreetMap Nominatim) ─────────────────────
-
-  /// Поиск места по тексту (второй внешний API в проекте).
-  static const String nominatimSearchUrl =
-      'https://nominatim.openstreetmap.org/search';
-
-  static const String nominatimReverseUrl =
-      'https://nominatim.openstreetmap.org/reverse';
-
-  static const Duration geocodingTimeout = Duration(seconds: 12);
-
-  /// User-Agent обязателен по правилам Nominatim.
-  static const String nominatimUserAgent =
-      'Structurator/1.0 (AuroraHackathon; field-reports)';
-
   /// Максимум фото к одному отчёту.
   static const int maxAttachedImages = 5;
 

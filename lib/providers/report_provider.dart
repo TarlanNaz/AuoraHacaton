@@ -45,6 +45,11 @@ class ReportProvider extends ChangeNotifier {
   List<Report> get managerInbox => List.unmodifiable(_managerInbox);
   List<Report> get drafts =>
       _workerReports.where((r) => r.status == ReportStatus.draft).toList();
+
+  /// Отправленные и проверенные отчёты (всё, кроме черновиков).
+  List<Report> get submittedReports =>
+      _workerReports.where((r) => r.status != ReportStatus.draft).toList();
+
   List<Report> get sentReports =>
       _workerReports.where((r) => r.status == ReportStatus.sent).toList();
   List<Report> get rejectedReports =>

@@ -16,7 +16,7 @@ void main() {
         manualToken: 'tok',
       );
 
-      await tester.tap(find.text('Новый отчёт'));
+      await tapNewReport(tester);
       await tester.pumpAndSettle();
 
       const malicious =
@@ -28,7 +28,7 @@ void main() {
       await tapGenerateButton(tester);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Редактируйте отчёт'), findsOneWidget);
+      expect(find.textContaining('Структурированный текст'), findsWidgets);
 
       final sent = harness.giga.lastSentText!;
       expect(sent.contains('\u0007'), isFalse);

@@ -102,29 +102,26 @@ class _WorkerDashboardState extends State<WorkerDashboard>
                 ),
               ],
             ),
-            bottom: Theme(
-              data: Theme.of(context).copyWith(
-                tabBarTheme: TabBarThemeData(
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white.withValues(alpha: 0.7),
-                  indicatorColor: AppTheme.accentAmber,
-                  dividerColor: Colors.transparent,
-                ),
-              ),
-              child: TabBar(
-                controller: _tabs,
-                tabs: [
-                  const Tab(text: 'Все'),
-                  Tab(
-                    child: Consumer<ReportProvider>(
-                      builder: (_, rp, __) {
-                        final n = rp.drafts.length;
-                        return Text(n > 0 ? 'Черновики ($n)' : 'Черновики');
-                      },
-                    ),
+            bottom: AuroraSegmentedTabs(
+              controller: _tabs,
+              tabs: [
+                Tab(
+                  child: Consumer<ReportProvider>(
+                    builder: (_, rp, __) {
+                      final n = rp.submittedReports.length;
+                      return Text(n > 0 ? 'Отчёты ($n)' : 'Отчёты');
+                    },
                   ),
-                ],
-              ),
+                ),
+                Tab(
+                  child: Consumer<ReportProvider>(
+                    builder: (_, rp, __) {
+                      final n = rp.drafts.length;
+                      return Text(n > 0 ? 'Черновики ($n)' : 'Черновики');
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
@@ -137,28 +134,33 @@ class _WorkerDashboardState extends State<WorkerDashboard>
                 return TabBarView(
                   controller: _tabs,
                   children: [
-                    provider.workerReports.isEmpty
+                    provider.submittedReports.isEmpty
                         ? AppEmptyState(
                             icon: Icons.description_outlined,
-                            title: 'Нет отчётов',
+                            title: 'Нет отправленных отчётов',
                             subtitle:
-                                'Создайте отчёт с фото и сырыми заметками — ИИ оформит его по шаблону',
+                                'Нажмите «Новый отчёт», заполните заметки и отправьте руководителю',
                             action: FilledButton.icon(
                               onPressed: () => _openCreate(context),
                               icon: const Icon(Icons.add),
-                              label: const Text('Создать отчёт'),
+                              label: const Text('Новый отчёт'),
                             ),
                           )
                         : _ReportList(
-                            reports: provider.workerReports,
+                            reports: provider.submittedReports,
                             onOpen: (r) => _openReport(context, r),
                           ),
                     provider.drafts.isEmpty
-                        ? const AppEmptyState(
+                        ? AppEmptyState(
                             icon: Icons.edit_note_outlined,
                             title: 'Черновиков нет',
                             subtitle:
                                 'Незавершённые отчёты сохраняются автоматически при создании',
+                            action: OutlinedButton.icon(
+                              onPressed: () => _openCreate(context),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Новый отчёт'),
+                            ),
                           )
                         : _ReportList(
                             reports: provider.drafts,
@@ -171,10 +173,33 @@ class _WorkerDashboardState extends State<WorkerDashboard>
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openCreate(context),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Новый отчёт'),
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceWhite,
+          border: const Border(top: BorderSide(color: AppTheme.cardBorder)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, -3),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: FilledButton.icon(
+              key: const Key('worker_new_report'),
+              onPressed: () => _openCreate(context),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Новый отчёт'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(AppTheme.minTouchTarget),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -255,7 +280,7 @@ class _ReportList extends StatelessWidget {
   Widget build(BuildContext context) {
     final df = DateFormat('dd.MM.yyyy · HH:mm');
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
       itemCount: reports.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, i) {

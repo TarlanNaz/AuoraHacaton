@@ -64,12 +64,16 @@ class AuthScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 32),
                     Material(
-                      color: Colors.white,
-                      elevation: 8,
-                      shadowColor: Colors.black.withValues(alpha: 0.2),
+                      color: AppTheme.surfaceWhite,
+                      elevation: 0,
+                      shadowColor: Colors.transparent,
                       borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                        side: const BorderSide(color: AppTheme.cardBorder),
+                      ),
                       child: const Padding(
-                        padding: EdgeInsets.all(24),
+                        padding: EdgeInsets.all(28),
                         child: _LoginForm(),
                       ),
                     ),
@@ -191,6 +195,7 @@ class _LoginFormState extends State<_LoginForm> {
           onPressed: _busy ? null : _submit,
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(AppTheme.minTouchTarget),
+            padding: const EdgeInsets.symmetric(vertical: 14),
           ),
           child: _busy
               ? SizedBox(
@@ -201,7 +206,7 @@ class _LoginFormState extends State<_LoginForm> {
                     color: scheme.onPrimary,
                   ),
                 )
-              : const Text('Войти'),
+              : const Text('Войти в систему'),
         ),
       ],
     );
