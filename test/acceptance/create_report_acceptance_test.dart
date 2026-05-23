@@ -30,7 +30,7 @@ void main() {
       await tester.tap(find.text('Сгенерировать'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Редактируйте отчёт перед отправкой'), findsOneWidget);
+      expect(find.textContaining('Редактируйте отчёт'), findsOneWidget);
       expect(find.textContaining('Структурированный текст'), findsWidgets);
 
       expect(harness.storage.persisted, hasLength(1));

@@ -7,6 +7,8 @@ class StorageKeys {
   static const String templates = 'templates_v1';
   static const String managerInbox = 'manager_inbox_v1';
   static const String sendQueue = 'send_queue_v1';
-  static const String mockSeeded = 'mock_inbox_seeded_v1';
+  static const String mockSeeded = 'mock_inbox_seeded_v2';
   static const String workerProfile = 'worker_profile_v1';
+  static const String authUsers = 'auth_users_v1';
+  static const String authSession = 'auth_session_v1';
 }

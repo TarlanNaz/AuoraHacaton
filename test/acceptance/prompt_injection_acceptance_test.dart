@@ -28,7 +28,7 @@ void main() {
       await tester.tap(find.text('Сгенерировать'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Редактируйте отчёт перед отправкой'), findsOneWidget);
+      expect(find.textContaining('Редактируйте отчёт'), findsOneWidget);
 
       final sent = harness.giga.lastSentText!;
       expect(sent.contains('\u0007'), isFalse);

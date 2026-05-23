@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../services/giga_chat_service.dart';
 import '../utils/app_logger.dart';
 import '../utils/input_validator.dart';
+import '../utils/report_response_guard.dart';
 
 enum GenerationStatus { empty, loading, error, success }
 
@@ -72,6 +73,7 @@ class GenerationProvider extends ChangeNotifier {
         imageFiles: imageFiles,
         systemPrompt: systemPrompt,
       );
+      ReportResponseGuard.ensureValidReport(answer);
       _result = answer;
       _status = GenerationStatus.success;
     } on GigaChatException catch (e) {

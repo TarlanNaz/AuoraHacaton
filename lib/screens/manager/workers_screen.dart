@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../config/app_theme.dart';
 import '../../models/worker_summary.dart';
 import '../../providers/report_provider.dart';
+import '../../widgets/app_ui.dart';
 import '../../widgets/profile_avatar.dart';
 import 'worker_reports_screen.dart';
 
@@ -20,14 +22,11 @@ class WorkersScreen extends StatelessWidget {
 
         final workers = rp.workerSummaries;
         if (workers.isEmpty) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Text(
-                'Пока нет отчётов от рабочих.\nОни появятся после отправки с поля.',
-                textAlign: TextAlign.center,
-              ),
-            ),
+          return const AppEmptyState(
+            icon: Icons.groups_outlined,
+            title: 'Рабочих пока нет',
+            subtitle:
+                'Список появится после того, как полевые сотрудники отправят отчёты',
           );
         }
 
@@ -49,51 +48,76 @@ class _WorkerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final scheme = Theme.of(context).colorScheme;
     final df = DateFormat('dd.MM.yyyy');
 
-    return Card(
-      child: ListTile(
-        leading: ProfileAvatar(name: summary.workerName, radius: 24),
-        title: Text(summary.workerName),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text('Отчётов: ${summary.totalReports}'),
-            if (summary.lastReportAt != null)
-              Text('Последний: ${df.format(summary.lastReportAt!)}'),
-          ],
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            if (summary.pendingCount > 0)
-              Badge(
-                label: Text('${summary.pendingCount}'),
-                child: const Icon(Icons.inbox_outlined),
-              )
-            else
-              Icon(Icons.chevron_right, color: theme.colorScheme.outline),
-            if (summary.rejectedCount > 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  'Откл.: ${summary.rejectedCount}',
-                  style: theme.textTheme.labelSmall?.copyWith(color: Colors.red),
+    return AppCard(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => WorkerReportsScreen(workerName: summary.workerName),
+          ),
+        );
+      },
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          ProfileAvatar(name: summary.workerName, radius: 26),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  summary.workerName,
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
-              ),
-          ],
-        ),
-        isThreeLine: true,
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => WorkerReportsScreen(workerName: summary.workerName),
+                const SizedBox(height: 6),
+                Text(
+                  'Отчётов: ${summary.totalReports}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                if (summary.lastReportAt != null)
+                  Text(
+                    'Последний: ${df.format(summary.lastReportAt!)}',
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+              ],
             ),
-          );
-        },
+          ),
+          Column(
+            children: [
+              if (summary.pendingCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                  ),
+                  child: Text(
+                    '${summary.pendingCount} новых',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.primary,
+                    ),
+                  ),
+                )
+              else
+                Icon(Icons.chevron_right, color: scheme.outline),
+              if (summary.rejectedCount > 0) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Откл.: ${summary.rejectedCount}',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: scheme.error,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }

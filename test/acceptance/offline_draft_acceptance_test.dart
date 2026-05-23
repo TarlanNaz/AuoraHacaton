@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:structurator/config/report_prompts.dart';
 import 'package:structurator/models/report_status.dart';
 import 'package:structurator/services/giga_chat_service.dart';
 
@@ -8,7 +9,7 @@ import '../helpers/test_app.dart';
 
 void main() {
   testWidgets(
-    'When network fails, then user can save draft locally with raw data preserved',
+    'When network fails, then draft autosaves locally with raw data preserved',
     (tester) async {
       final harness = await pumpStructurator(
         tester,
@@ -23,14 +24,16 @@ void main() {
 
       const rawNotes = 'обработано 45 метрик, нет сети сейчас';
       await tester.enterText(find.byType(TextField).first, rawNotes);
-      await tester.pump();
+      await tester.pump(ReportPrompts.draftAutosaveDebounce);
+      await tester.pumpAndSettle();
 
       await tester.tap(find.text('Сгенерировать'));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Нет интернета'), findsWidgets);
 
-      await tester.tap(find.text('Черновик'));
+      await tester.enterText(find.byType(TextField).first, '$rawNotes дополнение');
+      await tester.pump(ReportPrompts.draftAutosaveDebounce);
       await tester.pumpAndSettle();
 
       await tester.tap(find.byIcon(Icons.arrow_back));
@@ -42,7 +45,7 @@ void main() {
       expect(harness.storage.persisted, hasLength(1));
       final draft = harness.storage.persisted.single;
       expect(draft.status, ReportStatus.draft);
-      expect(draft.rawText, rawNotes);
+      expect(draft.rawText, contains('обработано 45 метрик'));
       expect(draft.finalText, isNull);
     },
   );

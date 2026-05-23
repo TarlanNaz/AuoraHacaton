@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../config/app_theme.dart';
 import '../../models/report_template.dart';
 import '../../models/report_type.dart';
 import '../../providers/template_provider.dart';
+import '../../widgets/app_ui.dart';
 
 class TemplatesScreen extends StatelessWidget {
   const TemplatesScreen({super.key});
@@ -19,35 +21,78 @@ class TemplatesScreen extends StatelessWidget {
         return Column(
           children: [
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: FilledButton.icon(
                 onPressed: () => _edit(context, null),
-                icon: const Icon(Icons.add),
+                icon: const Icon(Icons.add_rounded),
                 label: const Text('Новый шаблон'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(46),
+                ),
               ),
             ),
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ListView.separated(
+                padding: const EdgeInsets.all(16),
                 itemCount: tp.templates.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (context, i) {
                   final t = tp.templates[i];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    child: ListTile(
-                      title: Text(t.title),
-                      subtitle: Text(
-                        t.instruction,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: t.isDefault
-                          ? null
-                          : IconButton(
-                              icon: const Icon(Icons.delete_outline),
-                              onPressed: () => tp.remove(t.id),
-                            ),
-                      onTap: () => _edit(context, t),
+                  final scheme = Theme.of(context).colorScheme;
+                  return AppCard(
+                    onTap: () => _edit(context, t),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: scheme.primaryContainer,
+                            borderRadius:
+                                BorderRadius.circular(AppTheme.radiusSm),
+                          ),
+                          child: Icon(
+                            t.reportType?.icon ?? Icons.description_outlined,
+                            color: scheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                t.title,
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                              if (t.reportType != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  t.reportType!.label,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelMedium
+                                      ?.copyWith(color: scheme.primary),
+                                ),
+                              ],
+                              const SizedBox(height: 8),
+                              Text(
+                                t.instruction,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (!t.isDefault)
+                          IconButton(
+                            icon: Icon(Icons.delete_outline,
+                                color: scheme.error),
+                            onPressed: () => tp.remove(t.id),
+                          ),
+                      ],
                     ),
                   );
                 },
@@ -79,10 +124,11 @@ class TemplatesScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<ReportType>(
-                  value: type,
+                  initialValue: type,
                   decoration: const InputDecoration(labelText: 'Тип отчёта'),
                   items: ReportType.values
-                      .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
+                      .map((t) =>
+                          DropdownMenuItem(value: t, child: Text(t.label)))
                       .toList(),
                   onChanged: (v) => setSt(() => type = v ?? type),
                 ),
@@ -99,8 +145,12 @@ class TemplatesScreen extends StatelessWidget {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Сохранить')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Отмена')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Сохранить')),
           ],
         ),
       ),

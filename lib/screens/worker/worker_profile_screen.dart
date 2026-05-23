@@ -1,17 +1,18 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/report.dart';
 import '../../models/report_status.dart';
+import '../../models/report_type.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/generation_provider.dart';
 import '../../providers/report_provider.dart';
 import '../../providers/worker_profile_provider.dart';
 import '../../utils/app_navigation.dart';
-import '../../utils/ui_feedback.dart';
+import '../../widgets/app_ui.dart';
 import '../../widgets/profile_avatar.dart';
 import '../../widgets/report_chips.dart';
 import 'create_report_screen.dart';
@@ -24,15 +25,20 @@ class WorkerProfileScreen extends StatefulWidget {
 }
 
 class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
-  late final TextEditingController _nameController;
   File? _photoFile;
 
   @override
   void initState() {
     super.initState();
-    final profile = context.read<WorkerProfileProvider>().profile;
-    _nameController = TextEditingController(text: profile.fullName);
-    _loadPhoto();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrapProfile());
+  }
+
+  Future<void> _bootstrapProfile() async {
+    final session = context.read<AuthProvider>().session;
+    if (session != null) {
+      await context.read<WorkerProfileProvider>().applyFromAuthSession(session);
+    }
+    await _loadPhoto();
   }
 
   Future<void> _loadPhoto() async {
@@ -40,123 +46,123 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     if (mounted) setState(() => _photoFile = file);
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
-  }
+  void _requestProfileChange(BuildContext context) {
+    final profile = context.read<WorkerProfileProvider>().profile;
+    final login = context.read<AuthProvider>().userLogin ?? '—';
+    final template =
+        'Запрос на изменение персональных данных в профиле.\n\n'
+        'Текущие данные в системе:\n'
+        '— ФИО: ${profile.fullName}\n'
+        '— Логин: $login\n\n'
+        'Прошу изменить на:\n'
+        '— ФИО: \n'
+        '— Причина / комментарий: \n';
 
-  Future<void> _pickPhoto(ImageSource source) async {
-    try {
-      final picked = await ImagePicker().pickImage(
-        source: source,
-        maxWidth: 512,
-        maxHeight: 512,
-        imageQuality: 88,
-      );
-      if (picked == null) return;
-      await context.read<WorkerProfileProvider>().setPhotoFromFile(File(picked.path));
-      await _loadPhoto();
-      if (mounted) UiFeedback.info(context, 'Фото профиля обновлено');
-    } catch (e) {
-      if (mounted) UiFeedback.warning(context, 'Не удалось загрузить фото: $e');
-    }
-  }
-
-  void _photoMenu() {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Сделать фото'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickPhoto(ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Из галереи'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickPhoto(ImageSource.gallery);
-              },
-            ),
-            if (_photoFile != null)
-              ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: const Text('Удалить фото'),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  await context.read<WorkerProfileProvider>().clearPhoto();
-                  if (mounted) setState(() => _photoFile = null);
-                },
-              ),
-          ],
+    context.read<GenerationProvider>().reset();
+    Navigator.of(context).push(
+      AppNavigation.detailRoute(
+        CreateReportScreen(
+          initialText: template,
+          initialType: ReportType.clientVisit,
+          profileChangeRequest: true,
         ),
       ),
     );
-  }
-
-  Future<void> _saveName() async {
-    await context.read<WorkerProfileProvider>().updateFullName(_nameController.text);
-    if (mounted) UiFeedback.info(context, 'ФИО сохранено');
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final df = DateFormat('dd.MM.yyyy HH:mm');
+    final profileProv = context.watch<WorkerProfileProvider>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Профиль')),
-      body: Consumer2<WorkerProfileProvider, ReportProvider>(
-        builder: (context, profileProv, reports, _) {
+      backgroundColor: theme.colorScheme.surface,
+      appBar: AppBar(
+        title: const Text('Мой профиль'),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(gradient: AuroraGradient.header),
+        ),
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+      ),
+      body: Consumer<ReportProvider>(
+        builder: (context, reports, _) {
           final stats = reports.workerStats;
           final drafts = reports.drafts;
 
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Card(
-                child: Padding(
+              AppCard(
                   padding: const EdgeInsets.all(20),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      ProfileAvatar(
-                        photoFile: _photoFile,
-                        name: profileProv.profile.fullName,
-                        radius: 48,
-                        onTap: _photoMenu,
+                      Center(
+                        child: ProfileAvatar(
+                          photoFile: _photoFile,
+                          name: profileProv.profile.fullName,
+                          radius: 52,
+                        ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
                       Text(
-                        'Нажмите на фото, чтобы изменить',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                        profileProv.profile.fullName,
+                        style: theme.textTheme.headlineSmall,
+                        textAlign: TextAlign.center,
+                      ),
+                      if (context.watch<AuthProvider>().userLogin != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Логин: ${context.read<AuthProvider>().userLogin}',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: theme.colorScheme.onPrimaryContainer,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Данные профиля закреплены. Изменить их напрямую нельзя.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onPrimaryContainer,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 16),
-                      TextField(
-                        controller: _nameController,
-                        decoration: const InputDecoration(
-                          labelText: 'ФИО',
-                          border: OutlineInputBorder(),
-                        ),
-                        textCapitalization: TextCapitalization.words,
+                      OutlinedButton.icon(
+                        onPressed: () => _requestProfileChange(context),
+                        icon: const Icon(Icons.edit_document),
+                        label: const Text('Изменить данные'),
                       ),
-                      const SizedBox(height: 12),
-                      FilledButton(
-                        onPressed: _saveName,
-                        child: const Text('Сохранить ФИО'),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Откроется форма отчёта с запросом на исправление ФИО или фото',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
-                ),
               ),
               const SizedBox(height: 16),
               Text('Статистика', style: theme.textTheme.titleMedium),
@@ -265,24 +271,28 @@ class _StatChip extends StatelessWidget {
     final c = color ?? Theme.of(context).colorScheme.primary;
     return SizedBox(
       width: 160,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              Icon(icon, color: c, size: 22),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                    Text(label, style: Theme.of(context).textTheme.bodySmall),
-                  ],
-                ),
+      child: AppCard(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Icon(icon, color: c, size: 22),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(label, style: Theme.of(context).textTheme.bodySmall),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -302,9 +312,11 @@ class _DraftTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return AppCard(
       margin: const EdgeInsets.only(bottom: 8),
+      onTap: onOpen,
       child: ListTile(
+        contentPadding: EdgeInsets.zero,
         title: Text(report.title),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,7 +335,6 @@ class _DraftTile extends StatelessWidget {
         ),
         trailing: const Icon(Icons.chevron_right),
         isThreeLine: true,
-        onTap: onOpen,
       ),
     );
   }

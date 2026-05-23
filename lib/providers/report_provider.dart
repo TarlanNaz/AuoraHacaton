@@ -88,7 +88,7 @@ class ReportProvider extends ChangeNotifier {
       _manualToken = await _storage.readManualToken();
 
       if (seedManagerMock) {
-        await MockInboxSeeder(_storage).seedIfNeeded();
+        await MockInboxSeeder(_storage, _images).seedIfNeeded();
         _managerInbox = await _storage.loadManagerInbox();
       }
 
@@ -130,14 +130,90 @@ class ReportProvider extends ChangeNotifier {
     return fresh.accessToken;
   }
 
+  /// Создаёт или обновляет черновик (для автосохранения и ручного сценария).
+  /// Возвращает `null`, если сохранять нечего (пустой текст и нет фото).
+  Future<Report?> upsertDraft({
+    String? existingId,
+    required String rawText,
+    String? finalText,
+    required ReportType type,
+    required String workerName,
+    List<String> imagePaths = const [],
+    String? templateId,
+  }) async {
+    final trimmedRaw = rawText.trim();
+    final trimmedFinal = (finalText ?? '').trim();
+    final hasContent =
+        trimmedRaw.isNotEmpty || trimmedFinal.isNotEmpty || imagePaths.isNotEmpty;
+    if (!hasContent) return null;
+
+    final storedRaw = trimmedRaw.isEmpty && imagePaths.isNotEmpty
+        ? 'Черновик с фото (см. приложения)'
+        : trimmedRaw;
+
+    final idx = existingId != null
+        ? _workerReports.indexWhere((r) => r.id == existingId)
+        : -1;
+
+    final omitRaw = trimmedFinal.isNotEmpty;
+
+    if (idx >= 0) {
+      final prev = _workerReports[idx];
+      if (prev.status != ReportStatus.draft &&
+          prev.status != ReportStatus.rejected) {
+        return prev;
+      }
+      _workerReports[idx] = prev.copyWith(
+        rawText: omitRaw ? null : (storedRaw.isEmpty ? prev.rawText : storedRaw),
+        finalText: trimmedFinal.isEmpty ? prev.finalText : trimmedFinal,
+        type: type,
+        imagePaths: imagePaths,
+        workerName: workerName,
+        status: ReportStatus.draft,
+        templateId: templateId,
+        clearManagerFeedback: true,
+        clearRawText: omitRaw,
+      );
+    } else {
+      _workerReports.insert(
+        0,
+        Report(
+          id: _uuid.v4(),
+          rawText: omitRaw ? null : (storedRaw.isEmpty ? null : storedRaw),
+          finalText: trimmedFinal.isEmpty ? null : trimmedFinal,
+          type: type,
+          status: ReportStatus.draft,
+          createdAt: DateTime.now(),
+          imagePaths: List.from(imagePaths),
+          workerName: workerName,
+          templateId: templateId,
+        ),
+      );
+    }
+
+    await _storage.saveReports(_workerReports);
+    notifyListeners();
+    return idx >= 0 ? _workerReports[idx] : _workerReports.first;
+  }
+
   Future<Report> saveDraft({
     required String rawText,
     required ReportType type,
     required String workerName,
     List<String> imagePaths = const [],
     String? templateId,
+    String? existingId,
   }) async {
-    final report = Report(
+    final saved = await upsertDraft(
+      existingId: existingId,
+      rawText: rawText,
+      type: type,
+      workerName: workerName,
+      imagePaths: imagePaths,
+      templateId: templateId,
+    );
+    if (saved != null) return saved;
+    return Report(
       id: _uuid.v4(),
       rawText: rawText,
       type: type,
@@ -147,10 +223,6 @@ class ReportProvider extends ChangeNotifier {
       workerName: workerName,
       templateId: templateId,
     );
-    _workerReports.insert(0, report);
-    await _storage.saveReports(_workerReports);
-    notifyListeners();
-    return report;
   }
 
   Future<Report> saveGenerated({

@@ -25,42 +25,63 @@ class TemplateProvider extends ChangeNotifier {
     if (_templates.isEmpty) {
       _templates = _defaultTemplates();
       await _storage.saveTemplates(_templates);
+    } else {
+      await ensureOnePerReportType();
     }
 
     _loading = false;
     notifyListeners();
   }
 
-  List<ReportTemplate> _defaultTemplates() => [
-        ReportTemplate(
+  /// По одному шаблону на каждый [ReportType] (для руководителя и ИИ).
+  Future<void> ensureOnePerReportType() async {
+    var changed = false;
+    for (final type in ReportType.values) {
+      if (_templates.any((t) => t.reportType == type)) continue;
+      _templates.add(_defaultTemplateFor(type));
+      changed = true;
+    }
+    if (changed) {
+      await _storage.saveTemplates(_templates);
+      notifyListeners();
+    }
+  }
+
+  List<ReportTemplate> _defaultTemplates() =>
+      ReportType.values.map(_defaultTemplateFor).toList();
+
+  ReportTemplate _defaultTemplateFor(ReportType type) {
+    return switch (type) {
+      ReportType.incident => ReportTemplate(
           id: _uuid.v4(),
           title: 'Шаблон инцидента',
           reportType: ReportType.incident,
           instruction:
               'Обязательно указывать: время обнаружения, время устранения, '
               'причину (если известна), ответственного, влияние на пользователей. '
-              'Не выдумывать цифры.',
+              'Не выдумывать цифры. Сырые обрывки — разложить по разделам.',
           isDefault: true,
         ),
-        ReportTemplate(
+      ReportType.metrics => ReportTemplate(
           id: _uuid.v4(),
           title: 'Шаблон метрик',
           reportType: ReportType.metrics,
           instruction:
-              'Только цифры из исходного текста. Если метрика не названа — '
-              '«не указано». Отдельно выделить аномалии.',
+              'Только цифры из исходного текста и фото. Если метрика не названа — '
+              '«не указано». Отдельно выделить аномалии. Таблица показателей обязательна.',
           isDefault: true,
         ),
-        ReportTemplate(
+      ReportType.clientVisit => ReportTemplate(
           id: _uuid.v4(),
           title: 'Шаблон визита',
           reportType: ReportType.clientVisit,
           instruction:
               'Указать компанию, контакт, договорённости, следующий шаг. '
-              'Бюджет и сроки — только если есть в тексте.',
+              'Бюджет и сроки — только если есть в тексте или на фото.',
           isDefault: true,
         ),
-      ];
+    };
+  }
 
   ReportTemplate? templateForType(ReportType type) {
     final typed =

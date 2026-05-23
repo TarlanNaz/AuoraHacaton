@@ -3,10 +3,13 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../config/auth_stubs.dart';
+import '../models/auth_session.dart';
 import '../models/worker_profile.dart';
 import '../services/image_storage_service.dart';
 import '../services/storage_service.dart';
 import '../utils/app_logger.dart';
+import '../utils/demo_asset_importer.dart';
 
 class WorkerProfileProvider extends ChangeNotifier {
   WorkerProfileProvider({
@@ -16,6 +19,7 @@ class WorkerProfileProvider extends ChangeNotifier {
         _images = imageStorage ?? FileImageStorageService();
 
   static const _tag = 'WorkerProfileProvider';
+  static const _demoAvatarAsset = 'assets/images/demo_worker_avatar.png';
 
   final StorageService _storage;
   final ImageStorageService _images;
@@ -36,35 +40,30 @@ class WorkerProfileProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateFullName(String name) async {
-    final trimmed = name.trim();
-    if (trimmed.isEmpty) return;
-    _profile = profile.copyWith(fullName: trimmed);
-    await _storage.saveWorkerProfile(_profile!);
-    notifyListeners();
-  }
+  /// Подставляет ФИО и демо-фото после входа (профиль только для просмотра).
+  Future<void> applyFromAuthSession(AuthSession session) async {
+    var current = await _storage.loadWorkerProfile();
+    current ??= WorkerProfile.initial(id: session.userId);
 
-  Future<void> setPhotoFromFile(File source) async {
-    try {
-      final old = profile.photoPath;
-      final stored = await _images.saveFromFile(source);
-      _profile = profile.copyWith(photoPath: stored);
-      await _storage.saveWorkerProfile(_profile!);
-      if (old != null && old != stored) {
-        await _images.delete(old);
+    current = current.copyWith(
+      id: session.userId,
+      fullName: session.displayName,
+    );
+
+    final isDemoWorker = session.login == AuthStubs.workerLogin;
+    if (isDemoWorker && current.photoPath == null) {
+      try {
+        final stored = await DemoAssetImporter(imageStorage: _images)
+            .importAsset(_demoAvatarAsset);
+        current = current.copyWith(photoPath: stored);
+      } catch (e, st) {
+        AppLogger.warn(_tag, 'demo avatar import failed', e);
+        AppLogger.error(_tag, 'demo avatar', error: e, stackTrace: st);
       }
-      notifyListeners();
-    } catch (e, st) {
-      AppLogger.error(_tag, 'setPhoto failed', error: e, stackTrace: st);
-      rethrow;
     }
-  }
 
-  Future<void> clearPhoto() async {
-    final old = profile.photoPath;
-    _profile = profile.copyWith(clearPhoto: true);
+    _profile = current;
     await _storage.saveWorkerProfile(_profile!);
-    if (old != null) await _images.delete(old);
     notifyListeners();
   }
 

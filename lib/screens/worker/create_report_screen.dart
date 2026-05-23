@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/report_prompts.dart';
@@ -11,7 +12,9 @@ import '../../providers/report_provider.dart';
 import '../../providers/template_provider.dart';
 import '../../providers/worker_profile_provider.dart';
 import '../../services/image_storage_service.dart';
+import '../../utils/draft_autosave.dart';
 import '../../utils/ui_feedback.dart';
+import '../../widgets/app_ui.dart';
 import '../widgets/attached_images_panel.dart';
 
 class CreateReportScreen extends StatefulWidget {
@@ -21,12 +24,14 @@ class CreateReportScreen extends StatefulWidget {
     this.initialImagePaths = const [],
     this.initialType,
     this.reportId,
+    this.profileChangeRequest = false,
   });
 
   final String? initialText;
   final List<String> initialImagePaths;
   final ReportType? initialType;
   final String? reportId;
+  final bool profileChangeRequest;
 
   @override
   State<CreateReportScreen> createState() => _CreateReportScreenState();
@@ -40,6 +45,10 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   String? _savedReportId;
   bool _sending = false;
 
+  late final DraftAutosave _autosave;
+  AutosaveUiState _autosaveUi = AutosaveUiState.idle;
+  DateTime? _lastSavedAt;
+
   @override
   void initState() {
     super.initState();
@@ -48,13 +57,75 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     _type = widget.initialType ?? ReportType.incident;
     _imageNames = List.from(widget.initialImagePaths);
     _savedReportId = widget.reportId;
+
+    _autosave = DraftAutosave(
+      debounce: ReportPrompts.draftAutosaveDebounce,
+      onSave: _persistDraft,
+    );
+
+    _rawController.addListener(_onContentChanged);
+    _resultController.addListener(_onContentChanged);
+
+    if (_rawController.text.isNotEmpty || _imageNames.isNotEmpty) {
+      _autosave.schedule();
+    }
   }
 
   @override
   void dispose() {
+    _autosave.dispose();
     _rawController.dispose();
     _resultController.dispose();
     super.dispose();
+  }
+
+  void _onContentChanged() {
+    if (!mounted) return;
+    setState(() => _autosaveUi = AutosaveUiState.pending);
+    _autosave.schedule();
+  }
+
+  Future<void> _persistDraft() async {
+    if (!mounted) return;
+
+    final gen = context.read<GenerationProvider>();
+    final hasStructured = gen.status == GenerationStatus.success;
+    final raw = hasStructured ? '' : _rawController.text;
+    final hasPhotos = _imageNames.isNotEmpty;
+    if (raw.trim().isEmpty && !hasPhotos && _resultController.text.trim().isEmpty) {
+      return;
+    }
+
+    setState(() => _autosaveUi = AutosaveUiState.saving);
+
+    try {
+      final rp = context.read<ReportProvider>();
+      final profile = context.read<WorkerProfileProvider>().profile;
+      final tpl = context.read<TemplateProvider>().templateForType(_type);
+
+      final finalText = hasStructured ? _resultController.text : null;
+
+      final saved = await rp.upsertDraft(
+        existingId: _savedReportId,
+        rawText: raw,
+        finalText: finalText,
+        type: _type,
+        workerName: profile.fullName,
+        imagePaths: _imageNames,
+        templateId: tpl?.id,
+      );
+
+      if (!mounted) return;
+      if (saved != null) {
+        _savedReportId = saved.id;
+        setState(() {
+          _autosaveUi = AutosaveUiState.saved;
+          _lastSavedAt = DateTime.now();
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _autosaveUi = AutosaveUiState.error);
+    }
   }
 
   Future<List<File>> _imageFiles() async {
@@ -69,14 +140,18 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
 
   String _systemPrompt() {
     final tpl = context.read<TemplateProvider>().instructionForType(_type);
+    final name = context.read<WorkerProfileProvider>().profile.fullName;
     return ReportPrompts.buildSystemPrompt(
       type: _type,
       templateInstruction: tpl,
       imageCount: _imageNames.length,
+      workerName: name,
     );
   }
 
   Future<void> _generate() async {
+    await _autosave.flush();
+
     final raw = _rawController.text.trim();
     if (raw.isEmpty && _imageNames.isEmpty) {
       UiFeedback.warning(context, 'Введите текст или прикрепите фото');
@@ -111,27 +186,24 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         existingId: _savedReportId,
       );
       _savedReportId = saved.id;
-      UiFeedback.info(context, 'Отчёт сгенерирован. Можно отредактировать перед отправкой');
+      _autosave.schedule();
+      if (mounted) {
+        UiFeedback.info(context, 'Отчёт сгенерирован. Правки сохраняются автоматически');
+      }
     }
   }
 
-  Future<void> _saveDraft() async {
-    final raw = _rawController.text.trim();
-    if (raw.isEmpty && _imageNames.isEmpty) return;
-    final rp = context.read<ReportProvider>();
-    final workerName = context.read<WorkerProfileProvider>().profile.fullName;
-    final r = await rp.saveDraft(
-      rawText: raw.isEmpty ? 'Черновик с фото (см. приложения)' : raw,
-      type: _type,
-      workerName: workerName,
-      imagePaths: _imageNames,
-    );
-    _savedReportId = r.id;
-    UiFeedback.draftSavedLocally(context);
-  }
-
   Future<void> _sendToManager() async {
+    await _autosave.flush();
+
     if (_savedReportId == null) {
+      UiFeedback.warning(context, 'Сначала введите заметки или сгенерируйте отчёт');
+      return;
+    }
+
+    final gen = context.read<GenerationProvider>();
+    if (gen.status != GenerationStatus.success &&
+        _resultController.text.trim().isEmpty) {
       UiFeedback.warning(context, 'Сначала сгенерируйте отчёт');
       return;
     }
@@ -163,117 +235,212 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     }
   }
 
+  Future<bool> _onWillPop() async {
+    await _autosave.flush();
+    return true;
+  }
+
   void _applySample(SampleInput s) {
     setState(() => _type = s.reportType);
     _rawController.text = s.body;
+    _autosave.schedule();
     UiFeedback.info(
       context,
       s.requiresPhoto ? 'Добавьте фото — без них отчёт будет неполным' : 'Пример вставлен',
     );
   }
 
+  void _onImagesChanged(List<String> names) {
+    setState(() => _imageNames = names);
+    _autosave.schedule();
+  }
+
+  void _onTypeChanged(ReportType? v) {
+    setState(() => _type = v ?? _type);
+    _autosave.schedule();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Создание отчёта'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.maybePop(context),
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) await _autosave.flush();
+      },
+      child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        appBar: AppBar(
+          title: Text(
+            widget.profileChangeRequest
+                ? 'Запрос на изменение данных'
+                : 'Создание отчёта',
+          ),
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(gradient: AuroraGradient.header),
+          ),
+          backgroundColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              final leave = await _onWillPop();
+              if (leave && context.mounted) Navigator.maybePop(context);
+            },
+          ),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Center(child: _AutosaveIndicator(state: _autosaveUi, savedAt: _lastSavedAt)),
+            ),
+          ],
         ),
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (widget.profileChangeRequest)
+                AppCard(
+                  backgroundColor:
+                      Theme.of(context).colorScheme.primaryContainer,
+                  borderColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    'Опишите, какие данные в профиле неверны и как должно быть '
+                    'правильно. Отчёт уйдёт руководителю на согласование.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        ),
+                  ),
+                ),
+              if (widget.profileChangeRequest) const SizedBox(height: 12),
               DropdownButtonFormField<ReportType>(
-                value: _type,
-                decoration: const InputDecoration(
-                  labelText: 'Тип отчёта',
-                  border: OutlineInputBorder(),
+                  value: _type,
+                  decoration: const InputDecoration(
+                    labelText: 'Тип отчёта',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: ReportType.values
+                      .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
+                      .toList(),
+                  onChanged: _onTypeChanged,
                 ),
-                items: ReportType.values
-                    .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
-                    .toList(),
-                onChanged: (v) => setState(() => _type = v ?? _type),
-              ),
-              const SizedBox(height: 12),
-              _SamplesStrip(type: _type, onPick: _applySample),
-              const SizedBox(height: 12),
-              AttachedImagesPanel(
-                imageNames: _imageNames,
-                imageStorage: context.read<ImageStorageService>(),
-                onChanged: (n) => setState(() => _imageNames = n),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _rawController,
-                maxLines: 4,
-                minLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Сырые заметки',
-                  hintText: 'Кратко, как в блокноте. Детали — на фото.',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+              if (!widget.profileChangeRequest) ...[
+                _SamplesStrip(type: _type, onPick: _applySample),
+                const SizedBox(height: 12),
+              ],
+                AttachedImagesPanel(
+                  imageNames: _imageNames,
+                  imageStorage: context.read<ImageStorageService>(),
+                  onChanged: _onImagesChanged,
                 ),
-              ),
-              const SizedBox(height: 12),
-              Consumer<GenerationProvider>(
-                builder: (context, gen, _) => FilledButton.icon(
-                  onPressed: gen.isLoading ? null : _generate,
-                  icon: gen.isLoading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.auto_awesome),
-                  label: Text(gen.isLoading ? 'Анализ…' : 'Сгенерировать'),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _rawController,
+                  maxLines: 4,
+                  minLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Сырые заметки',
+                    hintText: 'Кратко, как в блокноте. Сохраняется автоматически.',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(child: _ResultArea(controller: _resultController)),
-              const SizedBox(height: 8),
-              Consumer<GenerationProvider>(
-                builder: (context, gen, _) {
-                  if (gen.status != GenerationStatus.success &&
-                      gen.status != GenerationStatus.error) {
-                    return const SizedBox.shrink();
-                  }
-                  return Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _saveDraft,
-                          child: const Text('Черновик'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 2,
-                        child: FilledButton.icon(
-                          onPressed: _sending || gen.status != GenerationStatus.success
-                              ? null
-                              : _sendToManager,
-                          icon: _sending
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.send_rounded),
-                          label: const Text('Отправить руководителю'),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ],
+                const SizedBox(height: 12),
+                Consumer<GenerationProvider>(
+                  builder: (context, gen, _) => FilledButton.icon(
+                    onPressed: gen.isLoading ? null : _generate,
+                    icon: gen.isLoading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.auto_awesome),
+                    label: Text(gen.isLoading ? 'Анализ…' : 'Сгенерировать'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Expanded(child: _ResultArea(controller: _resultController)),
+                const SizedBox(height: 8),
+                Consumer<GenerationProvider>(
+                  builder: (context, gen, _) {
+                    if (gen.status != GenerationStatus.success &&
+                        gen.status != GenerationStatus.error) {
+                      return const SizedBox.shrink();
+                    }
+                    if (gen.status == GenerationStatus.error) {
+                      return const SizedBox.shrink();
+                    }
+                    return FilledButton.icon(
+                      onPressed: _sending ? null : _sendToManager,
+                      icon: _sending
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send_rounded),
+                      label: const Text('Отправить руководителю'),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+enum AutosaveUiState { idle, pending, saving, saved, error }
+
+class _AutosaveIndicator extends StatelessWidget {
+  const _AutosaveIndicator({required this.state, this.savedAt});
+
+  final AutosaveUiState state;
+  final DateTime? savedAt;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final (icon, label, color) = switch (state) {
+      AutosaveUiState.idle => (
+          Icons.cloud_outlined,
+          'Черновик',
+          theme.colorScheme.onSurfaceVariant,
+        ),
+      AutosaveUiState.pending => (
+          Icons.cloud_sync_outlined,
+          '…',
+          theme.colorScheme.onSurfaceVariant,
+        ),
+      AutosaveUiState.saving => (
+          Icons.cloud_upload_outlined,
+          'Сохранение',
+          theme.colorScheme.primary,
+        ),
+      AutosaveUiState.saved => (
+          Icons.cloud_done_outlined,
+          savedAt != null ? DateFormat('HH:mm').format(savedAt!) : 'Сохранено',
+          theme.colorScheme.primary,
+        ),
+      AutosaveUiState.error => (
+          Icons.cloud_off_outlined,
+          'Ошибка',
+          theme.colorScheme.error,
+        ),
+    };
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 4),
+        Text(label, style: theme.textTheme.labelMedium?.copyWith(color: color)),
+      ],
     );
   }
 }
@@ -343,8 +510,10 @@ class _ResultArea extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text('Редактируйте отчёт перед отправкой',
-                        style: Theme.of(context).textTheme.titleSmall),
+                    Text(
+                      'Редактируйте отчёт — изменения сохраняются автоматически',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
                     const SizedBox(height: 8),
                     Expanded(
                       child: TextField(

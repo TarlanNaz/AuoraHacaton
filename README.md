@@ -1,17 +1,39 @@
-# structurator
+# Структуратор
 
-A new Flutter project.
+Оффлайн-first Flutter-приложение для полевых сотрудников: сырые заметки и фото → структурированный отчёт через **GigaChat** → отправка руководителю с приёмом или отклонением.
 
-## Getting Started
+Хакатон «Пульс Авроры». Без Firebase, данные на устройстве (`shared_preferences` + локальные файлы).
 
-This project is a starting point for a Flutter application.
+## Быстрый старт
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+copy .env.example .env   # Windows
+# Заполните GIGACHAT_AUTH_KEY — https://developers.sber.ru/portal/products/gigachat-api
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+flutter pub get
+flutter run --dart-define=ENABLE_LOGGING=true
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Документация
+
+| Документ | Для кого |
+|----------|----------|
+| **[docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)** | Второй разработчик: все функции, роли, архитектура, API провайдеров, хранилище |
+| **[docs/TOOLS_ROADMAP.md](docs/TOOLS_ROADMAP.md)** | Идеи инструментов для улучшения генерации (голос, OCR, RAG, чек-листы) |
+| **[AGENTS.md](AGENTS.md)** | AI-агенты и дисциплина тестов (DAE/ATDD) |
+
+## Роли в приложении
+
+- **Рабочий** — отчёты, черновики, профиль (ФИО, фото), генерация ИИ, отправка.
+- **Руководитель** — список рабочих, входящие, шаблоны промптов, принять / отклонить с замечаниями.
+
+## Тесты
+
+```bash
+flutter test
+flutter analyze
+```
+
+## Стек
+
+Flutter 3.19+, Dart 3.3+, Provider, http, shared_preferences, image_picker, flutter_dotenv.

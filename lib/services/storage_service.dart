@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/storage_keys.dart';
+import '../models/auth_session.dart';
 import '../models/report.dart';
 import '../models/report_template.dart';
+import '../models/stored_user.dart';
 import '../models/user_role.dart';
 import '../models/worker_profile.dart';
 import '../utils/app_logger.dart';
@@ -33,6 +35,11 @@ abstract class StorageService {
 
   Future<WorkerProfile?> loadWorkerProfile();
   Future<void> saveWorkerProfile(WorkerProfile profile);
+
+  Future<List<StoredUser>> loadAuthUsers();
+  Future<void> saveAuthUsers(List<StoredUser> users);
+  Future<AuthSession?> readAuthSession();
+  Future<void> saveAuthSession(AuthSession? session);
 }
 
 class SharedPrefsStorageService implements StorageService {
@@ -173,5 +180,43 @@ class SharedPrefsStorageService implements StorageService {
       StorageKeys.workerProfile,
       jsonEncode(profile.toJson()),
     );
+  }
+
+  @override
+  Future<List<StoredUser>> loadAuthUsers() =>
+      _loadList(StorageKeys.authUsers, StoredUser.fromJson);
+
+  @override
+  Future<void> saveAuthUsers(List<StoredUser> users) =>
+      _saveList(StorageKeys.authUsers, users, (u) => u.toJson());
+
+  @override
+  Future<AuthSession?> readAuthSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(StorageKeys.authSession);
+      if (raw == null || raw.isEmpty) return null;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return null;
+      return AuthSession.fromJson(decoded);
+    } catch (e, st) {
+      AppLogger.error(_tag, 'load auth session failed', error: e, stackTrace: st);
+      return null;
+    }
+  }
+
+  @override
+  Future<void> saveAuthSession(AuthSession? session) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (session == null) {
+      await prefs.remove(StorageKeys.authSession);
+      await prefs.remove(StorageKeys.userRole);
+    } else {
+      await prefs.setString(
+        StorageKeys.authSession,
+        jsonEncode(session.toJson()),
+      );
+      await prefs.setString(StorageKeys.userRole, session.role.id);
+    }
   }
 }

@@ -3,7 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:structurator/models/report.dart';
 import 'package:structurator/models/user_role.dart';
+import 'package:structurator/config/auth_stubs.dart';
 import 'package:structurator/providers/auth_provider.dart';
+import 'package:structurator/services/mock_auth_service.dart';
 import 'package:structurator/providers/generation_provider.dart';
 import 'package:structurator/providers/report_provider.dart';
 import 'package:structurator/providers/template_provider.dart';
@@ -51,9 +53,14 @@ Future<HarnessHandles> pumpStructurator(
     await fakeStorage.saveManualToken(manualToken);
   }
 
-  final auth = AuthProvider(storage: fakeStorage);
+  final mockAuth = LocalMockAuthService(fakeStorage);
+  await mockAuth.ensureSeeded();
+  final auth = AuthProvider(storage: fakeStorage, authService: mockAuth);
   await auth.init();
-  await auth.login(UserRole.worker);
+  await auth.login(
+    login: AuthStubs.workerLogin,
+    password: AuthStubs.workerPassword,
+  );
 
   final templates = TemplateProvider(storage: fakeStorage);
   await templates.init();
@@ -74,6 +81,7 @@ Future<HarnessHandles> pumpStructurator(
     MultiProvider(
       providers: [
         Provider<StorageService>.value(value: fakeStorage),
+        Provider<MockAuthService>.value(value: mockAuth),
         Provider<GigaChatService>.value(value: fakeGiga),
         Provider<ImageStorageService>(
           create: (_) => FileImageStorageService(),

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:structurator/config/report_prompts.dart';
 import 'package:structurator/providers/generation_provider.dart';
 import 'package:structurator/services/giga_chat_service.dart';
 
@@ -41,6 +42,22 @@ void main() {
       expect(p.status, GenerationStatus.error);
       expect(p.error, isNotNull);
       expect(fake.generateCalls, 0);
+    });
+
+    test('reject marker from model shows incorrect formulation error', () async {
+      final fake = FakeGigaChatService(
+        response: '${ReportPrompts.inputInvalidMarker}: только тест',
+      );
+      final p = GenerationProvider(service: fake);
+
+      await p.generate(
+        rawText: 'обработано 45 метрик, всё хорошо',
+        tokenResolver: () async => 'tok',
+      );
+
+      expect(p.status, GenerationStatus.error);
+      expect(p.error, contains('некорректно'));
+      expect(p.result, isNull);
     });
 
     test('GigaChatException propagates as readable error', () async {

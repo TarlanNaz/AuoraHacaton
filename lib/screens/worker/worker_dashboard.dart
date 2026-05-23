@@ -10,10 +10,11 @@ import '../../providers/auth_provider.dart';
 import '../../providers/generation_provider.dart';
 import '../../providers/report_provider.dart';
 import '../../providers/worker_profile_provider.dart';
+import '../../config/app_theme.dart';
 import '../../utils/app_navigation.dart';
 import '../../utils/ui_feedback.dart';
+import '../../widgets/app_ui.dart';
 import '../../widgets/profile_avatar.dart';
-import '../../widgets/report_chips.dart';
 import 'create_report_screen.dart';
 import 'worker_profile_screen.dart';
 
@@ -33,7 +34,15 @@ class _WorkerDashboardState extends State<WorkerDashboard>
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
-    _loadAvatar();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrapProfile());
+  }
+
+  Future<void> _bootstrapProfile() async {
+    final session = context.read<AuthProvider>().session;
+    if (session != null) {
+      await context.read<WorkerProfileProvider>().applyFromAuthSession(session);
+    }
+    await _loadAvatar();
   }
 
   Future<void> _loadAvatar() async {
@@ -52,79 +61,118 @@ class _WorkerDashboardState extends State<WorkerDashboard>
     final profile = context.watch<WorkerProfileProvider>().profile;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Мои отчёты'),
-        bottom: TabBar(
-          controller: _tabs,
-          tabs: [
-            const Tab(text: 'Все'),
-            Tab(
-              child: Consumer<ReportProvider>(
-                builder: (_, rp, __) {
-                  final n = rp.drafts.length;
-                  return Text(n > 0 ? 'Черновики ($n)' : 'Черновики');
-                },
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      body: Column(
+        children: [
+          AuroraHeader(
+            title: 'Мои отчёты',
+            subtitle: profile.fullName,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                HeaderIconButton(
+                  tooltip: 'Профиль',
+                  icon: Icons.person_outline,
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const WorkerProfileScreen(),
+                      ),
+                    );
+                    await _loadAvatar();
+                  },
+                  child: ProfileAvatar(
+                    photoFile: _avatarFile,
+                    name: profile.fullName,
+                    radius: 16,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                HeaderIconButton(
+                  tooltip: 'Токен',
+                  icon: Icons.key_outlined,
+                  onPressed: () => _tokenDialog(context),
+                ),
+                const SizedBox(width: 4),
+                HeaderIconButton(
+                  tooltip: 'Выйти',
+                  icon: Icons.logout_rounded,
+                  onPressed: () => context.read<AuthProvider>().logout(),
+                ),
+              ],
+            ),
+            bottom: Theme(
+              data: Theme.of(context).copyWith(
+                tabBarTheme: TabBarThemeData(
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white.withValues(alpha: 0.7),
+                  indicatorColor: AppTheme.auroraMint,
+                  dividerColor: Colors.transparent,
+                ),
+              ),
+              child: TabBar(
+                controller: _tabs,
+                tabs: [
+                  const Tab(text: 'Все'),
+                  Tab(
+                    child: Consumer<ReportProvider>(
+                      builder: (_, rp, __) {
+                        final n = rp.drafts.length;
+                        return Text(n > 0 ? 'Черновики ($n)' : 'Черновики');
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Профиль',
-            onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const WorkerProfileScreen(),
-                ),
-              );
-              await _loadAvatar();
-            },
-            icon: ProfileAvatar(
-              photoFile: _avatarFile,
-              name: profile.fullName,
-              radius: 18,
+          ),
+          Expanded(
+            child: Consumer<ReportProvider>(
+              builder: (context, provider, _) {
+                if (provider.isInitializing) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                return TabBarView(
+                  controller: _tabs,
+                  children: [
+                    provider.workerReports.isEmpty
+                        ? AppEmptyState(
+                            icon: Icons.description_outlined,
+                            title: 'Нет отчётов',
+                            subtitle:
+                                'Создайте отчёт с фото и сырыми заметками — ИИ оформит его по шаблону',
+                            action: FilledButton.icon(
+                              onPressed: () => _openCreate(context),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Создать отчёт'),
+                            ),
+                          )
+                        : _ReportList(
+                            reports: provider.workerReports,
+                            onOpen: (r) => _openReport(context, r),
+                          ),
+                    provider.drafts.isEmpty
+                        ? const AppEmptyState(
+                            icon: Icons.edit_note_outlined,
+                            title: 'Черновиков нет',
+                            subtitle:
+                                'Незавершённые отчёты сохраняются автоматически при создании',
+                          )
+                        : _ReportList(
+                            reports: provider.drafts,
+                            onOpen: (r) => _openReport(context, r),
+                          ),
+                  ],
+                );
+              },
             ),
-          ),
-          IconButton(
-            tooltip: 'Токен GigaChat',
-            icon: const Icon(Icons.key_outlined),
-            onPressed: () => _tokenDialog(context),
-          ),
-          IconButton(
-            tooltip: 'Выйти',
-            icon: const Icon(Icons.logout),
-            onPressed: () => context.read<AuthProvider>().logout(),
           ),
         ],
       ),
-      body: Consumer<ReportProvider>(
-        builder: (context, provider, _) {
-          if (provider.isInitializing) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          return TabBarView(
-            controller: _tabs,
-            children: [
-              provider.workerReports.isEmpty
-                  ? _Empty(onCreate: () => _openCreate(context))
-                  : _ReportList(
-                      reports: provider.workerReports,
-                      onOpen: (r) => _openReport(context, r),
-                    ),
-              provider.drafts.isEmpty
-                  ? const _EmptyDrafts()
-                  : _ReportList(
-                      reports: provider.drafts,
-                      onOpen: (r) => _openReport(context, r),
-                    ),
-            ],
-          );
-        },
-      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openCreate(context),
-        icon: const Icon(Icons.add),
+        icon: const Icon(Icons.add_rounded),
         label: const Text('Новый отчёт'),
       ),
     );
@@ -200,49 +248,6 @@ class _WorkerDashboardState extends State<WorkerDashboard>
   }
 }
 
-class _Empty extends StatelessWidget {
-  const _Empty({required this.onCreate});
-  final VoidCallback onCreate;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.folder_open_rounded, size: 80),
-            const SizedBox(height: 16),
-            const Text('Нет отчётов', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            const Text('Создайте отчёт с фото и сырыми заметками', textAlign: TextAlign.center),
-            const SizedBox(height: 20),
-            FilledButton(onPressed: onCreate, child: const Text('Создать отчёт')),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyDrafts extends StatelessWidget {
-  const _EmptyDrafts();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(24),
-        child: Text(
-          'Черновиков нет.\nСохраните незавершённый отчёт при создании.',
-          textAlign: TextAlign.center,
-        ),
-      ),
-    );
-  }
-}
-
 class _ReportList extends StatelessWidget {
   const _ReportList({required this.reports, required this.onOpen});
 
@@ -251,50 +256,21 @@ class _ReportList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final df = DateFormat('dd.MM.yyyy HH:mm');
+    final df = DateFormat('dd.MM.yyyy · HH:mm');
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       itemCount: reports.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, i) {
         final r = reports[i];
         final feedback = r.managerFeedback;
-        return Card(
-          child: ListTile(
-            title: Text(r.title),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  children: [
-                    ReportTypeChip(type: r.type),
-                    ReportStatusChip(status: r.status),
-                    if (r.hasImages)
-                      const Chip(
-                        avatar: Icon(Icons.photo, size: 16),
-                        label: Text('Фото'),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(df.format(r.createdAt)),
-                if (feedback != null && feedback.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    'Замечания: $feedback',
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
-            ),
-            isThreeLine: feedback != null && feedback.isNotEmpty,
-            onTap: () => onOpen(r),
-          ),
+        return AppReportTile(
+          report: r,
+          dateLabel: df.format(r.createdAt),
+          onTap: () => onOpen(r),
+          feedback: feedback != null && feedback.isNotEmpty
+              ? 'Замечания: $feedback'
+              : null,
         );
       },
     );

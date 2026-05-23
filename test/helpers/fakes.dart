@@ -1,8 +1,10 @@
 import 'dart:io';
 
 import 'package:mocktail/mocktail.dart';
+import 'package:structurator/models/auth_session.dart';
 import 'package:structurator/models/report.dart';
 import 'package:structurator/models/report_template.dart';
+import 'package:structurator/models/stored_user.dart';
 import 'package:structurator/models/user_role.dart';
 import 'package:structurator/models/worker_profile.dart';
 import 'package:structurator/services/giga_chat_service.dart';
@@ -21,6 +23,8 @@ class FakeStorageService implements StorageService {
   UserRole? _role;
   bool _mockSeeded = false;
   WorkerProfile? _profile;
+  List<StoredUser> _authUsers = [];
+  AuthSession? _authSession;
 
   List<Report> get persisted => List.unmodifiable(_reports);
 
@@ -94,6 +98,24 @@ class FakeStorageService implements StorageService {
   @override
   Future<void> saveWorkerProfile(WorkerProfile profile) async {
     _profile = profile;
+  }
+
+  @override
+  Future<List<StoredUser>> loadAuthUsers() async =>
+      List<StoredUser>.of(_authUsers);
+
+  @override
+  Future<void> saveAuthUsers(List<StoredUser> users) async {
+    _authUsers = List<StoredUser>.of(users);
+  }
+
+  @override
+  Future<AuthSession?> readAuthSession() async => _authSession;
+
+  @override
+  Future<void> saveAuthSession(AuthSession? session) async {
+    _authSession = session;
+    _role = session?.role;
   }
 }
 

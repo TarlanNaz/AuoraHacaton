@@ -12,7 +12,8 @@ import 'providers/generation_provider.dart';
 import 'providers/report_provider.dart';
 import 'providers/template_provider.dart';
 import 'providers/worker_profile_provider.dart';
-import 'screens/login_screen.dart';
+import 'screens/auth/auth_screen.dart';
+import 'services/mock_auth_service.dart';
 import 'screens/manager/manager_dashboard.dart';
 import 'screens/worker/worker_dashboard.dart';
 import 'services/giga_chat_service.dart';
@@ -55,8 +56,14 @@ class StructuratorApp extends StatelessWidget {
         Provider<MockReportApiService>(
           create: (ctx) => HttpMockReportApiService(ctx.read<StorageService>()),
         ),
+        Provider<MockAuthService>(
+          create: (ctx) => LocalMockAuthService(ctx.read<StorageService>()),
+        ),
         ChangeNotifierProvider(
-          create: (ctx) => AuthProvider(storage: ctx.read<StorageService>())..init(),
+          create: (ctx) => AuthProvider(
+            storage: ctx.read<StorageService>(),
+            authService: ctx.read<MockAuthService>(),
+          )..init(),
         ),
         ChangeNotifierProvider(
           create: (ctx) => TemplateProvider(storage: ctx.read<StorageService>())..init(),
@@ -100,11 +107,25 @@ class _AppRoot extends StatelessWidget {
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
         if (!auth.isReady) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+          return Scaffold(
+            body: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppTheme.auroraDeep,
+                    AppTheme.auroraNavy,
+                  ],
+                ),
+              ),
+              child: const Center(
+                child: CircularProgressIndicator(color: AppTheme.auroraMint),
+              ),
+            ),
           );
         }
-        if (!auth.isLoggedIn) return const LoginScreen();
+        if (!auth.isLoggedIn) return const AuthScreen();
         return switch (auth.role!) {
           UserRole.worker => const WorkerDashboard(),
           UserRole.manager => const ManagerDashboard(),

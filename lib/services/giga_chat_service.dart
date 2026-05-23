@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
 import '../config/api_config.dart';
+import '../config/report_prompts.dart';
 import '../utils/app_logger.dart';
 import '../utils/input_validator.dart';
 
@@ -178,11 +179,7 @@ class HttpGigaChatService implements GigaChatService {
 
   String _buildUserContent(String sanitizedText, int imageCount) {
     if (imageCount == 0) return sanitizedText;
-    final photoNote =
-        '\n\n[К отчёту приложено $imageCount фото с полевого осмотра. '
-        'Учти это при формулировке разделов; если на снимках видны объекты '
-        'или дефекты — отрази в выводах.]';
-    return sanitizedText + photoNote;
+    return sanitizedText + ReportPrompts.photoUserHint(imageCount);
   }
 
   @override

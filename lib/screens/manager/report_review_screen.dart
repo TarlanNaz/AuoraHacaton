@@ -5,8 +5,11 @@ import 'package:provider/provider.dart';
 import '../../models/report.dart';
 import '../../models/report_status.dart';
 import '../../providers/report_provider.dart';
+import '../../services/image_storage_service.dart';
 import '../../utils/ui_feedback.dart';
+import '../../widgets/app_ui.dart';
 import '../../widgets/report_chips.dart';
+import '../../widgets/report_images_gallery.dart';
 
 class ReportReviewScreen extends StatelessWidget {
   const ReportReviewScreen({super.key, required this.report});
@@ -16,11 +19,24 @@ class ReportReviewScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final df = DateFormat('dd.MM.yyyy HH:mm');
+    final df = DateFormat('dd.MM.yyyy · HH:mm');
     final canReview = report.status == ReportStatus.sent;
+    final imageStorage = context.read<ImageStorageService>();
 
     return Scaffold(
-      appBar: AppBar(title: Text(report.title)),
+      backgroundColor: theme.colorScheme.surface,
+      appBar: AppBar(
+        title: Text(
+          report.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(gradient: AuroraGradient.header),
+        ),
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+      ),
       body: Consumer<ReportProvider>(
         builder: (context, rp, _) {
           final idx = rp.managerInbox.indexWhere((r) => r.id == report.id);
@@ -29,48 +45,91 @@ class ReportReviewScreen extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Wrap(
-                spacing: 8,
-                children: [
-                  ReportTypeChip(type: current.type),
-                  ReportStatusChip(status: current.status),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${current.workerName} · ${df.format(current.createdAt)}',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+              AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ReportTypeChip(type: current.type),
+                        ReportStatusChip(status: current.status),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.person_outline,
+                          size: 18,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            current.workerName,
+                            style: theme.textTheme.titleSmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      df.format(current.createdAt),
+                      style: theme.textTheme.labelMedium,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: SelectableText(
-                    current.finalText ?? current.rawText ?? '—',
+              if (current.hasImages) ...[
+                const SizedBox(height: 12),
+                AppCard(
+                  child: ReportImagesGallery(
+                    imagePaths: current.imagePaths,
+                    imageStorage: imageStorage,
                   ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Текст отчёта', style: theme.textTheme.titleSmall),
+                    const SizedBox(height: 12),
+                    SelectableText(
+                      current.finalText ?? current.rawText ?? '—',
+                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.55),
+                    ),
+                  ],
                 ),
               ),
               if ((current.managerFeedback ?? '').isNotEmpty) ...[
                 const SizedBox(height: 12),
-                Card(
-                  color: theme.colorScheme.errorContainer,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Замечания руководителя',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: theme.colorScheme.onErrorContainer,
+                AppCard(
+                  borderColor: theme.colorScheme.error.withValues(alpha: 0.4),
+                  backgroundColor:
+                      theme.colorScheme.errorContainer.withValues(alpha: 0.25),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.feedback_outlined,
+                              size: 18, color: theme.colorScheme.error),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Замечания',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: theme.colorScheme.error,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(current.managerFeedback!),
-                      ],
-                    ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(current.managerFeedback!),
+                    ],
                   ),
                 ),
               ],
@@ -80,6 +139,9 @@ class ReportReviewScreen extends StatelessWidget {
                   onPressed: () => _accept(context, current.id),
                   icon: const Icon(Icons.check_circle_outline),
                   label: const Text('Принять отчёт'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                  ),
                 ),
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
@@ -87,10 +149,12 @@ class ReportReviewScreen extends StatelessWidget {
                   icon: const Icon(Icons.cancel_outlined),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: theme.colorScheme.error,
+                    minimumSize: const Size.fromHeight(48),
                   ),
                   label: const Text('Отклонить с замечаниями'),
                 ),
               ],
+              const SizedBox(height: 24),
             ],
           );
         },
@@ -119,7 +183,9 @@ class ReportReviewScreen extends StatelessWidget {
       UiFeedback.info(context, 'Отчёт отклонён, рабочий увидит замечания');
       Navigator.of(context).pop();
     } on ArgumentError catch (e) {
-      if (context.mounted) UiFeedback.warning(context, e.message?.toString() ?? 'Ошибка');
+      if (context.mounted) {
+        UiFeedback.warning(context, e.message?.toString() ?? 'Ошибка');
+      }
     }
   }
 }
@@ -150,7 +216,6 @@ class _RejectDialogState extends State<_RejectDialog> {
         decoration: const InputDecoration(
           labelText: 'Что исправить',
           hintText: 'Укажите ошибки, нехватку данных, неверные формулировки…',
-          border: OutlineInputBorder(),
         ),
       ),
       actions: [
