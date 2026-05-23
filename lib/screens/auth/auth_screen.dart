@@ -122,8 +122,8 @@ class _LoginFormState extends State<_LoginForm> {
   }
 
   @override
-  @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
